@@ -1,0 +1,103 @@
+# ---------------------------------------------------------------------------
+# Faceless YouTube automation — main configuration.
+# Secrets never live here; they come from environment variables / GitHub Secrets.
+# ---------------------------------------------------------------------------
+
+channel:
+  name: "Quiet Frontiers"
+  # The niche drives every topic the ideation step invents. Make it narrow.
+  niche: "little-known engineering and science stories that changed the modern world"
+  language: "en-US"
+  audience: "curious English-speaking adults, 25-45, who watch explainer content"
+  tone: "calm, documentary, factual, no hype, no clickbait lies"
+  # Topics the ideation step must never pick.
+  banned_topics:
+    - "politics and elections"
+    - "ongoing wars or current conflicts"
+    - "medical or financial advice"
+    - "named living private individuals"
+
+longform:
+  enabled: true
+  target_seconds: 360          # ~6 minutes of narration
+  aspect_ratio: "16:9"
+  resolution: "1080p"
+
+shorts:
+  enabled: true
+  target_seconds: 50           # keep under 60s to qualify as a Short
+  aspect_ratio: "9:16"
+  # crop       -> reuse the 16:9 clips, centre-cropped (free)
+  # regenerate -> ask LTX for dedicated vertical clips (costs extra)
+  clip_strategy: "crop"
+  max_clips: 6
+
+video:
+  provider: "ltx"              # ltx | fal
+  model: "ltx-2-3-fast"        # ltx-2-fast / ltx-2-pro were retired 2026-08-15
+  clip_seconds: 8
+  max_clips: 12                # long-form B-roll clip count (12 x 8s = $3.84 at fast/1080p)
+  # How long each clip holds the screen before cutting to the next one.
+  segment_seconds: 11
+  transition_seconds: 0.5      # 0 disables cross-fades and uses hard cuts
+  concurrency: 3               # how many clips to generate at once
+  generate_audio: false        # we lay our own narration over the footage
+  fps: 25
+  # Appended to every shot prompt so the whole video looks like one piece.
+  style_suffix: "cinematic documentary footage, natural lighting, shallow depth of field, muted film colour grade, slow deliberate camera movement, no text, no watermark, no readable faces in close-up"
+  negative_prompt: "text, captions, watermark, logo, distorted hands, extra limbs, low quality, jitter"
+
+voice:
+  provider: "edge"             # edge (free) | elevenlabs
+  edge_voice: "en-US-AndrewMultilingualNeural"
+  edge_rate: "+6%"
+  edge_pitch: "+0Hz"
+  elevenlabs_voice_id: ""
+  elevenlabs_model: "eleven_multilingual_v2"
+
+captions:
+  enabled_longform: false      # long-form relies on YouTube's own captions
+  enabled_shorts: true         # burned-in captions are near-mandatory for Shorts
+  font: "DejaVu Sans"
+  font_size_shorts: 78
+  font_size_longform: 54
+  primary_colour: "&H00FFFFFF"     # ASS colours are &HAABBGGRR
+  highlight_colour: "&H0000E5FF"   # amber, used on the active word
+  outline: 4
+  margin_v: 260                # Shorts: distance from the bottom edge, in px
+  margin_v_longform: 90
+
+music:
+  enabled: true
+  # Drop your own royalty-free tracks here; the run picks one at random.
+  directory: "assets/music"
+  volume_db: -26               # music sits well under the narration
+  fade_seconds: 2.5
+
+publish:
+  timezone: "Europe/Istanbul"
+  # The fixed daily wall-clock publish time. The render can finish whenever;
+  # YouTube flips the video public at exactly this moment.
+  publish_at_local: "19:00"
+  # Shorts go out at a different slot so the two never compete with each other.
+  shorts_publish_at_local: "12:00"
+  # 27 = Education, 28 = Science & Technology, 24 = Entertainment
+  category_id: "27"
+  made_for_kids: false
+  default_tags:
+    - "documentary"
+    - "explained"
+    - "history of technology"
+
+budget:
+  # Hard ceiling. The run aborts before spending anything if the estimate is over.
+  max_usd_per_run: 5.00
+  # Per-second LTX prices used for the estimate (USD, 1080p).
+  ltx_price_per_second:
+    ltx-2-3-fast: 0.04
+    ltx-2-3-pro: 0.06
+
+state:
+  # Rolling memory so the ideation step never repeats itself.
+  history_file: "state/history.json"
+  dedupe_last_n: 120

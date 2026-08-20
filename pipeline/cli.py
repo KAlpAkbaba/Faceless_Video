@@ -1,0 +1,206 @@
+"""Command line entry point.
+
+    python -m pipeline.cli doctor          # check config and credentials
+    python -m pipeline.cli plan            # show the cost estimate, spend nothing
+    python -m pipeline.cli probe           # verify the LTX API shape with one cheap job
+    python -m pipeline.cli auth            # mint YouTube credentials (run locally, once)
+    python -m pipeline.cli run             # the full daily pipeline
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import shutil
+import sys
+from pathlib import Path
+
+from .budget import BudgetExceeded, estimate_run_cost
+from .config import Config, ConfigError
+from .run import CHARS_PER_SECOND, RunOptions, run
+
+
+def configure_logging(verbose: bool) -> None:
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(asctime)s %(levelname)-7s %(name)-18s %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    # These two are chatty at INFO and drown out the pipeline's own log.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("googleapiclient.discovery_cache").setLevel(logging.ERROR)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="pipeline", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("-c", "--config", default=None, help="Path to config.yaml")
+    parser.add_argument("-v", "--verbose", action="store_true")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("doctor", help="Check configuration, credentials and tooling.")
+    sub.add_parser("plan", help="Print the cost estimate for a run without spending anything.")
+
+    probe = sub.add_parser("probe", help="Submit one cheap clip and dump the raw API responses.")
+    probe.add_argument("--prompt", default="A slow pan across an empty workshop bench at dawn, dust in the light.")
+
+    auth = sub.add_parser("auth", help="Mint YouTube OAuth credentials. Run this locally, once.")
+    auth.add_argument("--client-secret", default="client_secret.json")
+
+    run_cmd = sub.add_parser("run", help="Run the full pipeline.")
+    run_cmd.add_argument("--only", choices=["both", "longform", "shorts"], default="both")
+    run_cmd.add_argument("--no-upload", action="store_true", help="Render locally, do not publish.")
+    run_cmd.add_argument("--work-dir", default=None)
+    run_cmd.add_argument("--output-dir", default=None)
+    return parser
+
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+
+
+def cmd_doctor(config: Config) -> int:
+    print(f"config           {config.path}")
+    print(f"channel          {config.get('channel.name')}")
+    print(f"video provider   {config.get('video.provider')} / {config.get('video.model')}")
+    print(f"voice provider   {config.get('voice.provider')}")
+    print(f"publish          {config.get('publish.publish_at_local')} {config.get('publish.timezone')}"
+          f"  (shorts {config.get('publish.shorts_publish_at_local')})")
+
+    ok = True
+    for tool in ("ffmpeg", "ffprobe"):
+        found = shutil.which(tool)
+        print(f"{tool:<16} {found or 'MISSING'}")
+        ok = ok and bool(found)
+
+    secrets = config.secrets
+    needed = [("ANTHROPIC_API_KEY", secrets.anthropic_api_key, True)]
+    if config.get("video.provider") == "ltx":
+        needed.append(("LTX_API_KEY", secrets.ltx_api_key, True))
+    else:
+        needed.append(("FAL_KEY", secrets.fal_api_key, True))
+    if config.get("voice.provider") == "elevenlabs":
+        needed.append(("ELEVENLABS_API_KEY", secrets.elevenlabs_api_key, True))
+    needed += [
+        ("YOUTUBE_CLIENT_ID", secrets.youtube_client_id, False),
+        ("YOUTUBE_CLIENT_SECRET", secrets.youtube_client_secret, False),
+        ("YOUTUBE_REFRESH_TOKEN", secrets.youtube_refresh_token, False),
+    ]
+    print()
+    for name, value, required in needed:
+        status = "set" if value else ("MISSING" if required else "missing (upload will fail)")
+        print(f"{name:<24} {status}")
+        ok = ok and (bool(value) or not required)
+
+    print()
+    print("OK" if ok else "Problems found — see MISSING entries above.")
+    return 0 if ok else 1
+
+
+def cmd_plan(config: Config) -> int:
+    do_longform = bool(config.get("longform.enabled", True))
+    do_shorts = bool(config.get("shorts.enabled", True))
+    regenerate = str(config.get("shorts.clip_strategy", "crop")) == "regenerate"
+    model = str(config.require("video.model"))
+    prices = config.get("budget.ltx_price_per_second", {}) or {}
+
+    narration_seconds = (float(config.get("longform.target_seconds", 360)) if do_longform else 0) + (
+        float(config.get("shorts.target_seconds", 50)) if do_shorts else 0
+    )
+    estimate = estimate_run_cost(
+        longform_clips=int(config.get("video.max_clips", 12)) if do_longform else 0,
+        shorts_clips=int(config.get("shorts.max_clips", 6)) if (do_shorts and regenerate) else 0,
+        clip_seconds=float(config.get("video.clip_seconds", 8)),
+        price_per_second=float(prices.get(model, 0.04)),
+        narration_chars=int(narration_seconds * CHARS_PER_SECOND),
+        voice_provider=str(config.get("voice.provider", "edge")),
+    )
+    ceiling = float(config.get("budget.max_usd_per_run", 5.0))
+    print(estimate.render())
+    print(f"\n  ceiling  ${ceiling:.2f} per run   ->  ~${estimate.total * 30:.0f}/month at one run per day")
+    if estimate.total > ceiling:
+        print("\nOver the ceiling — `run` would abort. Lower max_clips or raise budget.max_usd_per_run.")
+        return 1
+    return 0
+
+
+def cmd_probe(config: Config, prompt: str) -> int:
+    from .providers import build_provider
+
+    provider = build_provider(config)
+    try:
+        report = provider.probe(prompt)
+    finally:
+        close = getattr(provider, "close", None)
+        if callable(close):
+            close()
+    print(json.dumps(report, indent=2, default=str))
+    print(
+        "\nIf the paths above are wrong for your account, pin them with the "
+        "LTX_API_BASE / LTX_SUBMIT_PATH / LTX_STATUS_PATH environment variables."
+    )
+    return 0
+
+
+def cmd_auth(client_secret: str) -> int:
+    from .youtube import run_auth_flow
+
+    credentials = run_auth_flow(Path(client_secret))
+    print("\nAdd these three as GitHub repository secrets:\n")
+    for key, value in credentials.items():
+        print(f"  {key}={value}")
+    print(
+        "\nIf the OAuth consent screen is still in 'Testing', publish it first — "
+        "test-mode refresh tokens stop working after 7 days."
+    )
+    return 0
+
+
+def cmd_run(config: Config, args: argparse.Namespace) -> int:
+    options = RunOptions(
+        only=args.only,
+        upload=not args.no_upload,
+        work_dir=Path(args.work_dir) if args.work_dir else None,
+        output_dir=Path(args.output_dir) if args.output_dir else None,
+    )
+    report = run(config, options)
+    print("\n" + report.summary())
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    configure_logging(args.verbose)
+
+    if args.command == "auth":
+        # Authorisation runs before any config or credentials exist.
+        return cmd_auth(args.client_secret)
+
+    try:
+        config = Config.load(args.config)
+    except ConfigError as exc:
+        print(f"Configuration error: {exc}", file=sys.stderr)
+        return 2
+
+    try:
+        if args.command == "doctor":
+            return cmd_doctor(config)
+        if args.command == "plan":
+            return cmd_plan(config)
+        if args.command == "probe":
+            return cmd_probe(config, args.prompt)
+        if args.command == "run":
+            return cmd_run(config, args)
+    except BudgetExceeded as exc:
+        print(f"\nBudget stop: {exc}", file=sys.stderr)
+        return 3
+    except (ConfigError, RuntimeError) as exc:
+        logging.getLogger("pipeline").error("%s", exc)
+        return 1
+
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
