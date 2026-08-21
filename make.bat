@@ -37,26 +37,33 @@ if exist "%PY%" (
     goto deps
 )
 
-REM Windows ships Python under several names. Try each before giving up:
-REM the py launcher is the most reliable, and `python` is often only the
-REM Microsoft Store stub, which cannot create a virtualenv.
+REM Windows ships Python under several names, and a fresh install does not
+REM always become the launcher's default: PY_PYTHON or a py.ini can pin `py -3`
+REM to an old version. Ask for explicit versions first - those ignore the
+REM default - and only then fall back to the generic names. `python` alone is
+REM often just the Microsoft Store stub, which cannot create a virtualenv.
 set "BOOTSTRAP="
-py -3 --version >nul 2>nul && set "BOOTSTRAP=py -3"
-if not defined BOOTSTRAP (
-    python --version >nul 2>nul && set "BOOTSTRAP=python"
+
+REM An explicit override always wins:  set PYTHON_EXE=C:\path\to\python.exe
+if defined PYTHON_EXE (
+    "%PYTHON_EXE%" --version >nul 2>nul && set "BOOTSTRAP="%PYTHON_EXE%""
+    if not defined BOOTSTRAP echo WARNING: PYTHON_EXE is set but "%PYTHON_EXE%" did not run.
 )
-if not defined BOOTSTRAP (
-    python3 --version >nul 2>nul && set "BOOTSTRAP=python3"
+
+for %%v in (3.14 3.13 3.12 3.11) do (
+    if not defined BOOTSTRAP (
+        py -%%v --version >nul 2>nul && set "BOOTSTRAP=py -%%v"
+    )
 )
+if not defined BOOTSTRAP ( py -3 --version >nul 2>nul && set "BOOTSTRAP=py -3" )
+if not defined BOOTSTRAP ( python --version >nul 2>nul && set "BOOTSTRAP=python" )
+if not defined BOOTSTRAP ( python3 --version >nul 2>nul && set "BOOTSTRAP=python3" )
+
 if not defined BOOTSTRAP (
     echo ERROR: no working Python was found.
     echo.
     echo Install Python 3.11+ from https://www.python.org/downloads/ and tick
     echo "Add python.exe to PATH" during setup, then reopen this window.
-    echo.
-    echo If Python is already installed, check what these report:
-    echo     py -3 --version
-    echo     where.exe python
     exit /b 1
 )
 REM Refuse before building anything: a venv made by an old interpreter fails
@@ -66,8 +73,15 @@ if errorlevel 1 (
     echo ERROR: %BOOTSTRAP% is older than Python 3.11, which this pipeline requires.
     for /f "tokens=*" %%v in ('%BOOTSTRAP% --version 2^>^&1') do echo Found: %%v
     echo.
-    echo Install Python 3.11+ from https://www.python.org/downloads/, tick
-    echo "Add python.exe to PATH", reopen this window and run "make install" again.
+    echo If you just installed a newer Python, it is on this machine but not the
+    echo launcher's default. List every interpreter with its full path:
+    echo     py -0p
+    echo Then point this script straight at the new one, for example:
+    echo     set PYTHON_EXE=%%LOCALAPPDATA%%\Programs\Python\Python313\python.exe
+    echo     make install
+    echo.
+    echo Otherwise install Python 3.11+ from https://www.python.org/downloads/,
+    echo tick "Add python.exe to PATH", and reopen this window.
     exit /b 1
 )
 echo Creating the virtual environment with: %BOOTSTRAP%
