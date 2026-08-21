@@ -51,9 +51,10 @@ Save, then **Audience** → **Publish app**.
 
 ## Before publishing these pages
 
-Replace `CONTACT_EMAIL_BURAYA` in `privacy.html` and `terms.html` with a real
-address. Google expects a working contact route, and these pages are public —
-use an address you are willing to publish.
+The contact address in `privacy.html` and `terms.html` is the same one set as
+the app's support email on the OAuth consent screen, which Google already shows
+to anyone who authorises the app. Swap it for a different address if you would
+rather not have it on a public page.
 
 Update the channel name in the pages if you change `channel.name` in
 `config.yaml`.
