@@ -49,9 +49,44 @@ Yaz saati geçişlerinde de duvar saati sabit kalır (19:00 hep 19:00'dur).
 
 ### 2.1 Gereksinimler
 
+Python 3.11+ ve ffmpeg gerekiyor.
+
+**Linux / macOS**
+
 ```bash
-make install          # .venv kurar, bağımlılıkları yükler
-sudo apt-get install ffmpeg fonts-dejavu-core    # macOS: brew install ffmpeg
+make install                                   # .venv kurar, bağımlılıkları yükler
+sudo apt-get install ffmpeg fonts-dejavu-core  # macOS: brew install ffmpeg
+```
+
+**Windows**
+
+`make` Windows'ta yoktur; repoda aynı komutları karşılayan bir `make.bat` var,
+yani `cmd` içinde aynı komutlar çalışır:
+
+```cmd
+make install
+```
+
+Python yoksa python.org'dan kur ve kurulumda **"Add python.exe to PATH"** kutusunu
+işaretle. ffmpeg için:
+
+```cmd
+winget install Gyan.FFmpeg
+```
+
+Kurulumdan sonra **terminali kapatıp yeniden aç** (PATH yenilensin), `ffmpeg -version`
+ile doğrula.
+
+> ffmpeg sadece yerel render (`make dry` / `make run`) için gerekli. Token üretmek
+> (`make auth`), `doctor` ve `plan` için gerekmez — GitHub Actions ffmpeg'i kendi kurar.
+
+PowerShell kullanıyorsan `make` yerine `.\make.bat` yaz. `make` yüklemek istemiyorsan
+komutları doğrudan da çalıştırabilirsin:
+
+```cmd
+python -m venv .venv
+.venv\Scripts\python -m pip install -r requirements-dev.txt
+.venv\Scripts\python -m pipeline.cli doctor
 ```
 
 ### 2.2 API anahtarları
@@ -73,20 +108,41 @@ sudo apt-get install ffmpeg fonts-dejavu-core    # macOS: brew install ffmpeg
 ### 2.3 YouTube yetkilendirmesi (bir kez, kendi bilgisayarında)
 
 1. [Google Cloud Console](https://console.cloud.google.com) → yeni proje.
-2. **YouTube Data API v3**'ü etkinleştir.
-3. **OAuth consent screen** → External → uygulama bilgilerini doldur.
-4. ⚠️ **Publishing status'ü "In production" yap.** "Testing" modunda kalırsan
-   refresh token **7 günde bir bozulur** ve otomasyon sessizce durur. Bu, bu tür
-   kurulumların en sık ölüm sebebidir.
+2. **APIs & Services** → **Library** → **YouTube Data API v3** → *Enable*.
+3. **OAuth consent screen** → **Branding**. Sadece yıldızlı alanlar zorunludur:
+
+   | Alan | Ne yazılacak |
+   |---|---|
+   | App name * | Herhangi bir isim ("Youtube Video" olur) |
+   | User support email * | Kendi e-postan |
+   | Developer contact email * | Kendi e-postan |
+   | App logo | **Boş bırak** |
+   | Home page / Privacy policy / Terms | **Boş bırak** |
+   | Authorized domains | **Boş bırak** |
+
+   ⚠️ **Logo yükleme.** Google'ın kendi uyarısı: logo yüklenen uygulama doğrulamaya
+   (verification) girmek zorunda kalır. Kişisel bir otomasyon için buna gerek yok.
+   Alan adı / gizlilik politikası alanları da yalnızca doğrulama için gerekir;
+   boş bırakınca hiçbir şey kaybetmezsin. **Save** de.
+
+4. **Audience** sekmesi → *User type* **External** → ⚠️ **PUBLISH APP** → onayla.
+
+   Bu adım zorunlu. "Testing" modunda kalan bir uygulamanın refresh token'ı
+   **7 günde bir geçersiz olur** ve otomasyon sessizce durur — bu tür kurulumların
+   açık ara en sık ölüm sebebi budur. Uygulama doğrulanmamış olacağı için giriş
+   sırasında "Google hasn't verified this app" uyarısı görürsün; *Advanced →
+   Go to (uygulama adı)* ile geçersin. Kendi kanalın için bu tamamen normaldir.
+
 5. **Credentials** → Create Credentials → OAuth client ID → **Desktop app**.
    JSON'u indir, repo köküne `client_secret.json` olarak koy.
 6. Çalıştır (tarayıcı açılır, kanalını seç):
 
 ```bash
-.venv/bin/python -m pipeline.cli auth
+make auth          # Windows'ta da aynı
 ```
 
 Komut sana üç değer basar. Bunları GitHub'a Secret olarak ekle.
+Birden fazla kanalın varsa doğru hesabı seçtiğine dikkat et — seçim token'a gömülür.
 
 ### 2.4 GitHub Secrets
 
@@ -115,6 +171,7 @@ Ayrıca Settings → Actions → General → Workflow permissions →
 make doctor     # config + anahtarlar + ffmpeg kontrolü
 make plan       # bu çalıştırma ne kadara mal olur — hiçbir şey harcamaz
 make probe      # LTX'e tek ucuz iş gönderir, ham yanıtı basar
+make auth       # YouTube OAuth bilgilerini üretir (tarayıcı gerekir)
 make dry        # tam render, YouTube'a yükleme yok
 make run        # tam üretim + yayın
 make test       # 68 test

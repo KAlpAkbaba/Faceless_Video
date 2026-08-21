@@ -1,4 +1,4 @@
-.PHONY: install test doctor plan probe dry run clean
+.PHONY: install test doctor plan probe auth dry run clean
 
 install:
 	python -m venv .venv
@@ -15,6 +15,9 @@ plan:
 
 probe:
 	.venv/bin/python -m pipeline.cli probe
+
+auth:
+	.venv/bin/python -m pipeline.cli auth
 
 # Full render, nothing published, nothing spent on video or voice.
 dry:
