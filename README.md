@@ -78,11 +78,25 @@ sanal ortam varsa önce onu sil:
 rmdir /s /q .venv
 ```
 
-ffmpeg için:
+**Yeni Python kurdun ama hâlâ eskisi görünüyorsa:** Windows'un `py` başlatıcısı
+`PY_PYTHON` değişkeni veya bir `py.ini` ile eski bir sürüme sabitlenmiş olabilir.
+Kurulu yorumlayıcıları tam yollarıyla listele ve doğru olanı doğrudan göster:
+
+```cmd
+py -0p
+set PYTHON_EXE=%LOCALAPPDATA%\Programs\Python\Python313\python.exe
+make install
+```
+
+`PYTHON_EXE` her şeyin önüne geçer, `make install` onu kullanır.
+
+ffmpeg için (sadece yerel render gerekiyorsa; GitHub Actions kendi kurar):
 
 ```cmd
 winget install Gyan.FFmpeg
 ```
+
+`winget` yoksa Microsoft Store'dan "App Installer" kurulabilir.
 
 Kurulumdan sonra **terminali kapatıp yeniden aç** (PATH yenilensin), `ffmpeg -version`
 ile doğrula.
