@@ -31,6 +31,8 @@ goto help
 
 :install
 if exist "%PY%" (
+    "%PY%" -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" 2>nul
+    if errorlevel 1 goto stalevenv
     echo Reusing the existing .venv
     goto deps
 )
@@ -57,6 +59,17 @@ if not defined BOOTSTRAP (
     echo     where.exe python
     exit /b 1
 )
+REM Refuse before building anything: a venv made by an old interpreter fails
+REM later with a confusing "No module named 'zoneinfo'" instead of a clear message.
+%BOOTSTRAP% -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" 2>nul
+if errorlevel 1 (
+    echo ERROR: %BOOTSTRAP% is older than Python 3.11, which this pipeline requires.
+    for /f "tokens=*" %%v in ('%BOOTSTRAP% --version 2^>^&1') do echo Found: %%v
+    echo.
+    echo Install Python 3.11+ from https://www.python.org/downloads/, tick
+    echo "Add python.exe to PATH", reopen this window and run "make install" again.
+    exit /b 1
+)
 echo Creating the virtual environment with: %BOOTSTRAP%
 %BOOTSTRAP% -m venv .venv
 if errorlevel 1 exit /b 1
@@ -66,6 +79,18 @@ if not exist "%PY%" (
     echo real Python from python.org instead.
     exit /b 1
 )
+
+:stalevenv
+echo ERROR: the existing .venv was built with a Python older than 3.11.
+"%PY%" --version
+echo.
+echo Delete it and rebuild against a current Python:
+echo     rmdir /s /q .venv
+echo     make install
+echo.
+echo If "py -3 --version" also reports an old version, install Python 3.11+
+echo from https://www.python.org/downloads/ first.
+exit /b 1
 
 :deps
 echo Installing dependencies...

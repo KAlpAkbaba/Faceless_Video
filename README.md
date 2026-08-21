@@ -49,7 +49,10 @@ Yaz saati geçişlerinde de duvar saati sabit kalır (19:00 hep 19:00'dur).
 
 ### 2.1 Gereksinimler
 
-Python 3.11+ ve ffmpeg gerekiyor.
+**Python 3.11 veya üstü** ve ffmpeg gerekiyor. 3.11 alt sınırı keyfi değil:
+kod zaman dilimi işlemleri için `zoneinfo` kullanıyor (3.9'da geldi) ve modern
+tip sözdizimine dayanıyor. Daha eski bir Python'la kurulmuş `.venv` varsa
+`make install` bunu fark edip durur — klasörü silip tekrar kur.
 
 **Linux / macOS**
 
@@ -67,8 +70,15 @@ yani `cmd` içinde aynı komutlar çalışır:
 make install
 ```
 
-Python yoksa python.org'dan kur ve kurulumda **"Add python.exe to PATH"** kutusunu
-işaretle. ffmpeg için:
+Python yoksa (ya da 3.11'den eskiyse) python.org'dan kur ve kurulumda
+**"Add python.exe to PATH"** kutusunu işaretle. Eski bir Python'la oluşmuş
+sanal ortam varsa önce onu sil:
+
+```cmd
+rmdir /s /q .venv
+```
+
+ffmpeg için:
 
 ```cmd
 winget install Gyan.FFmpeg
@@ -149,7 +159,9 @@ python -m venv .venv
    Go to (uygulama adı)* ile geçersin. Kendi kanalın için bu tamamen normaldir.
 
 6. **Credentials** → Create Credentials → OAuth client ID → **Desktop app**.
-   JSON'u indir, repo köküne `client_secret.json` olarak koy.
+   JSON'u indir ve repo köküne koy. **Adını değiştirmene gerek yok** — Google'ın
+   verdiği `client_secret_1234-abcd.apps.googleusercontent.com.json` gibi uzun ad
+   olduğu gibi kalabilir, `auth` komutu dosyayı kendisi bulur.
 7. Çalıştır (tarayıcı açılır, kanalını seç):
 
 ```bash

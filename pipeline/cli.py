@@ -45,7 +45,11 @@ def build_parser() -> argparse.ArgumentParser:
     probe.add_argument("--prompt", default="A slow pan across an empty workshop bench at dawn, dust in the light.")
 
     auth = sub.add_parser("auth", help="Mint YouTube OAuth credentials. Run this locally, once.")
-    auth.add_argument("--client-secret", default="client_secret.json")
+    auth.add_argument(
+        "--client-secret",
+        default=None,
+        help="Path to the OAuth client secret JSON. Found automatically when omitted.",
+    )
 
     run_cmd = sub.add_parser("run", help="Run the full pipeline.")
     run_cmd.add_argument("--only", choices=["both", "longform", "shorts"], default="both")
@@ -143,10 +147,11 @@ def cmd_probe(config: Config, prompt: str) -> int:
     return 0
 
 
-def cmd_auth(client_secret: str) -> int:
-    from .youtube import run_auth_flow
+def cmd_auth(client_secret: str | None) -> int:
+    from .youtube import find_client_secret, run_auth_flow
 
-    credentials = run_auth_flow(Path(client_secret))
+    path = find_client_secret(Path(client_secret) if client_secret else None)
+    credentials = run_auth_flow(path)
     print("\nAdd these three as GitHub repository secrets:\n")
     for key, value in credentials.items():
         print(f"  {key}={value}")
@@ -174,8 +179,14 @@ def main(argv: list[str] | None = None) -> int:
     configure_logging(args.verbose)
 
     if args.command == "auth":
-        # Authorisation runs before any config or credentials exist.
-        return cmd_auth(args.client_secret)
+        # Authorisation runs before any config or credentials exist, so it sits
+        # outside the config load below — but it still needs the same clean
+        # error reporting rather than a traceback.
+        try:
+            return cmd_auth(args.client_secret)
+        except ConfigError as exc:
+            print(f"\n{exc}", file=sys.stderr)
+            return 2
 
     try:
         config = Config.load(args.config)
