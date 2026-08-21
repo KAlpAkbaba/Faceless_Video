@@ -7,6 +7,7 @@ timestamp and YouTube flips it public itself.
 
 from __future__ import annotations
 
+import json
 import logging
 import random
 import time
@@ -20,7 +21,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 
-from .config import Config, ConfigError, parse_hhmm
+from .config import REPO_ROOT, Config, ConfigError, parse_hhmm
 from .models import RenderResult
 
 log = logging.getLogger(__name__)
@@ -258,6 +259,36 @@ def publish_result(config: Config, youtube, result: RenderResult) -> str:
 # ---------------------------------------------------------------------------
 
 
+def find_client_secret(explicit: Path | None = None) -> Path:
+    """Locate the OAuth client secret file.
+
+    Google names the download after the client id — `client_secret_1234-abcd.
+    apps.googleusercontent.com.json` — so requiring an exact filename just makes
+    people rename it. Match the pattern instead.
+    """
+    if explicit is not None:
+        if not explicit.exists():
+            raise ConfigError(f"OAuth client secret file not found: {explicit}")
+        return explicit
+
+    candidates = sorted(REPO_ROOT.glob("client_secret*.json"))
+    if len(candidates) == 1:
+        log.info("Using OAuth client secret: %s", candidates[0].name)
+        return candidates[0]
+    if not candidates:
+        raise ConfigError(
+            f"No client_secret*.json found in {REPO_ROOT}.\n"
+            "Download it from Google Cloud Console -> Credentials -> your OAuth "
+            "client ID -> Download JSON, and save it in the repository root. "
+            "Keep the name Google gives it; there is no need to rename anything."
+        )
+    raise ConfigError(
+        "Found more than one client secret file:\n  "
+        + "\n  ".join(c.name for c in candidates)
+        + "\nDelete the ones you do not want, or pass --client-secret <path>."
+    )
+
+
 def run_auth_flow(client_secret_file: Path) -> dict[str, str]:
     """Open a browser once and return the credentials to store as CI secrets."""
     from google_auth_oauthlib.flow import InstalledAppFlow
@@ -265,7 +296,21 @@ def run_auth_flow(client_secret_file: Path) -> dict[str, str]:
     if not client_secret_file.exists():
         raise ConfigError(f"OAuth client secret file not found: {client_secret_file}")
 
-    flow = InstalledAppFlow.from_client_secrets_file(str(client_secret_file), SCOPES)
+    try:
+        flow = InstalledAppFlow.from_client_secrets_file(str(client_secret_file), SCOPES)
+    except json.JSONDecodeError as exc:
+        raise ConfigError(
+            f"{client_secret_file.name} is not valid JSON ({exc}). "
+            "Re-download it from Google Cloud Console -> Credentials."
+        ) from exc
+    except ValueError as exc:
+        # google-auth-oauthlib raises this for a credential of the wrong type,
+        # which almost always means a Web application client was downloaded.
+        raise ConfigError(
+            f"{client_secret_file.name} is not a desktop OAuth client ({exc}).\n"
+            "In Google Cloud Console -> Credentials -> Create Credentials -> "
+            "OAuth client ID, the application type must be 'Desktop app'."
+        ) from exc
     # access_type=offline + prompt=consent is what actually returns a refresh token.
     credentials = flow.run_local_server(port=0, access_type="offline", prompt="consent")
 

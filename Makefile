@@ -1,7 +1,9 @@
 .PHONY: install test doctor plan probe auth dry run clean
 
 install:
-	python -m venv .venv
+	python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" || \
+		{ echo "Python 3.11+ required; found $$(python3 --version)"; exit 1; }
+	python3 -m venv .venv
 	.venv/bin/pip install -q -r requirements-dev.txt
 
 test:
