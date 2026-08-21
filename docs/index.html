@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiet Frontiers — Automated Video Publishing</title>
+<meta name="description" content="A personal automation that writes, renders and schedules short documentary videos for its owner's own YouTube channel.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Quiet Frontiers</h1>
+  <p class="lead">A personal automation that writes, renders and schedules short documentary
+  videos for its owner&rsquo;s own YouTube channel.</p>
+  <nav>
+    <a href="privacy.html">Privacy Policy</a>
+    <a href="terms.html">Terms of Service</a>
+  </nav>
+</header>
+
+<h2>What this application does</h2>
+<p>
+  This is a single-operator publishing tool. Once a day it selects a topic, writes a narration
+  script, synthesises a voiceover, generates background footage, assembles a widescreen video
+  and a vertical short, and uploads both to <strong>one YouTube channel — the one owned by the
+  person who installed it</strong>. Each upload is scheduled to become public at a fixed time
+  of day.
+</p>
+<p>
+  It has no user accounts, no sign-up, and no public interface. Nobody other than the operator
+  authorises it, and it never reads or writes anyone else&rsquo;s channel.
+</p>
+
+<h2>Why it asks for YouTube access</h2>
+<p>
+  The application uses YouTube API Services to place finished videos on the operator&rsquo;s own
+  channel. It requests exactly two permissions and nothing else:
+</p>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>Permission</th><th>Why it is needed</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>youtube.upload</code></td>
+      <td>To upload the rendered video files to the operator&rsquo;s channel.</td>
+    </tr>
+    <tr>
+      <td><code>youtube.force-ssl</code></td>
+      <td>To set the title, description, tags, custom thumbnail and scheduled publication
+          time on those same uploads.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>
+  The application does not read subscriber data, comments, analytics, or any other channel
+  information, and it does not modify videos it did not upload itself.
+</p>
+
+<h2>How access is granted and revoked</h2>
+<p>
+  The operator signs in once through Google&rsquo;s standard consent screen. The resulting
+  credential is stored as an encrypted secret in the operator&rsquo;s own automation environment
+  and is used only to upload to their channel. Access can be withdrawn at any moment from
+  <a href="https://myaccount.google.com/permissions" rel="noopener">Google Account permissions</a>,
+  which immediately stops all further uploads.
+</p>
+
+<div class="card">
+  <p class="muted" style="margin:0">
+    This application&rsquo;s use of information received from Google APIs adheres to the
+    <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google
+    API Services User Data Policy</a>, including the Limited Use requirements. Full details are
+    in the <a href="privacy.html">Privacy Policy</a>.
+  </p>
+</div>
+
+<h2>Content</h2>
+<p>
+  Videos are produced with automated writing, speech synthesis and video generation tools. The
+  operator is responsible for everything published on the channel and reviews the system&rsquo;s
+  output. Corrections and content questions should be sent to the contact address in the
+  <a href="privacy.html">Privacy Policy</a>.
+</p>
+
+<footer>
+  <p>
+    By using YouTube API Services, this application is bound by the
+    <a href="https://www.youtube.com/t/terms" rel="noopener">YouTube Terms of Service</a>.
+    Google&rsquo;s handling of data is described in the
+    <a href="https://policies.google.com/privacy" rel="noopener">Google Privacy Policy</a>.
+  </p>
+  <p><a href="privacy.html">Privacy Policy</a> &middot; <a href="terms.html">Terms of Service</a></p>
+</footer>
+
+</div>
+</body>
+</html>

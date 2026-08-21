@@ -117,15 +117,30 @@ python -m venv .venv
    | User support email * | Kendi e-postan |
    | Developer contact email * | Kendi e-postan |
    | App logo | **Boş bırak** |
-   | Home page / Privacy policy / Terms | **Boş bırak** |
-   | Authorized domains | **Boş bırak** |
+   | Home page / Privacy policy / Terms | Adım 4'ten sonra doldurulacak |
+   | Authorized domains | Adım 4'ten sonra doldurulacak |
 
    ⚠️ **Logo yükleme.** Google'ın kendi uyarısı: logo yüklenen uygulama doğrulamaya
    (verification) girmek zorunda kalır. Kişisel bir otomasyon için buna gerek yok.
-   Alan adı / gizlilik politikası alanları da yalnızca doğrulama için gerekir;
-   boş bırakınca hiçbir şey kaybetmezsin. **Save** de.
 
-4. **Audience** sekmesi → *User type* **External** → ⚠️ **PUBLISH APP** → onayla.
+   Alan adı ve politika bağlantılarını şimdilik boş bırakıp **Save** de. Bir sonraki
+   adımda scope'ları ekleyince Google bu alanları zorunlu hale getirecek ve buraya
+   geri döneceğiz.
+
+4. **Data Access** → **Add or remove scopes** → `youtube` ara → şu ikisini ekle →
+   **Update** → **Save**:
+
+   ```
+   https://www.googleapis.com/auth/youtube.upload
+   https://www.googleapis.com/auth/youtube.force-ssl
+   ```
+
+   Bu iki scope "sensitive" sınıfındadır. Eklediğin anda Google, Branding
+   sayfasındaki ana sayfa / gizlilik politikası / kullanım şartları alanlarını
+   **zorunlu** hale getirir ve doğrulanmış bir alan adı ister. Hazır sayfalar
+   `docs/` klasöründe duruyor — kurulumu `docs/README.md` anlatıyor.
+
+5. **Audience** sekmesi → *User type* **External** → ⚠️ **PUBLISH APP** → onayla.
 
    Bu adım zorunlu. "Testing" modunda kalan bir uygulamanın refresh token'ı
    **7 günde bir geçersiz olur** ve otomasyon sessizce durur — bu tür kurulumların
@@ -133,9 +148,9 @@ python -m venv .venv
    sırasında "Google hasn't verified this app" uyarısı görürsün; *Advanced →
    Go to (uygulama adı)* ile geçersin. Kendi kanalın için bu tamamen normaldir.
 
-5. **Credentials** → Create Credentials → OAuth client ID → **Desktop app**.
+6. **Credentials** → Create Credentials → OAuth client ID → **Desktop app**.
    JSON'u indir, repo köküne `client_secret.json` olarak koy.
-6. Çalıştır (tarayıcı açılır, kanalını seç):
+7. Çalıştır (tarayıcı açılır, kanalını seç):
 
 ```bash
 make auth          # Windows'ta da aynı
