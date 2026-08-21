@@ -221,6 +221,18 @@ make test       # 68 test
 Tek seferlik elle tetikleme: repo → Actions → *Daily video* → **Run workflow**
 (uzun form / Shorts / ikisi seçilebilir, yükleme kapatılabilir).
 
+### Actions üzerinden teşhis
+
+Repo → Actions → **Diagnostics** → **Run workflow** → `doctor` / `plan` / `probe`.
+
+Bu, kontrolleri **repository secrets'ın kendisiyle** çalıştırır. Yereldeki bir
+çalıştırma sadece kendi bilgisayarının kurulu olduğunu kanıtlar; günlük üretimi
+besleyen şey ise secrets'tır. Yeni bir anahtar ekledikten sonra ilk bakılacak
+yer burasıdır.
+
+> `probe` gerçek bir 480p klip gönderir, birkaç sent tutar. `doctor` ve `plan`
+> hiçbir şey harcamaz.
+
 ### Bedava prova
 
 `config.yaml` içinde `voice.provider: silent` yaparsan seslendirme yerine sessiz
