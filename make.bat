@@ -30,16 +30,44 @@ echo Unknown target: %TARGET%
 goto help
 
 :install
-where python >nul 2>nul
-if errorlevel 1 (
-    echo ERROR: python was not found on PATH.
-    echo Install Python 3.11+ from https://www.python.org/downloads/
-    echo and tick "Add python.exe to PATH" during setup, then reopen this window.
+if exist "%PY%" (
+    echo Reusing the existing .venv
+    goto deps
+)
+
+REM Windows ships Python under several names. Try each before giving up:
+REM the py launcher is the most reliable, and `python` is often only the
+REM Microsoft Store stub, which cannot create a virtualenv.
+set "BOOTSTRAP="
+py -3 --version >nul 2>nul && set "BOOTSTRAP=py -3"
+if not defined BOOTSTRAP (
+    python --version >nul 2>nul && set "BOOTSTRAP=python"
+)
+if not defined BOOTSTRAP (
+    python3 --version >nul 2>nul && set "BOOTSTRAP=python3"
+)
+if not defined BOOTSTRAP (
+    echo ERROR: no working Python was found.
+    echo.
+    echo Install Python 3.11+ from https://www.python.org/downloads/ and tick
+    echo "Add python.exe to PATH" during setup, then reopen this window.
+    echo.
+    echo If Python is already installed, check what these report:
+    echo     py -3 --version
+    echo     where.exe python
     exit /b 1
 )
-echo Creating the virtual environment...
-python -m venv .venv
+echo Creating the virtual environment with: %BOOTSTRAP%
+%BOOTSTRAP% -m venv .venv
 if errorlevel 1 exit /b 1
+if not exist "%PY%" (
+    echo ERROR: .venv was not created properly.
+    echo A Microsoft Store Python stub cannot build a virtualenv - install the
+    echo real Python from python.org instead.
+    exit /b 1
+)
+
+:deps
 echo Installing dependencies...
 "%PY%" -m pip install --disable-pip-version-check -q -r requirements-dev.txt
 if errorlevel 1 exit /b 1
