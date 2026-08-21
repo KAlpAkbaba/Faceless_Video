@@ -1,0 +1,61 @@
+name: Diagnostics
+
+# Run the checks against the repository secrets themselves, which is what the
+# daily job actually uses — a local run only proves your own machine is set up.
+
+on:
+  workflow_dispatch:
+    inputs:
+      check:
+        description: "Which check to run"
+        type: choice
+        options: [doctor, plan, probe]
+        default: doctor
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install ffmpeg
+        # doctor reports on ffmpeg too, so install it here or the check would
+        # fail on a missing tool rather than on anything to do with the secrets.
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      - name: Install Python dependencies
+        run: pip install --disable-pip-version-check -q -r requirements.txt
+
+      - name: Warn before spending
+        if: inputs.check == 'probe'
+        run: |
+          echo "::notice::probe submits one real 480p clip to LTX. It costs a few cents."
+
+      - name: Run ${{ inputs.check }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LTX_API_KEY: ${{ secrets.LTX_API_KEY }}
+          LTX_API_BASE: ${{ vars.LTX_API_BASE }}
+          LTX_SUBMIT_PATH: ${{ vars.LTX_SUBMIT_PATH }}
+          LTX_STATUS_PATH: ${{ vars.LTX_STATUS_PATH }}
+          FAL_KEY: ${{ secrets.FAL_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          # Read in the shell, never through GitHub expression truthiness:
+          # on a non-dispatch event `inputs.*` is null, and `null == false`
+          # evaluates to true in expression syntax.
+          CHECK: ${{ inputs.check }}
+        run: python -m pipeline.cli "${CHECK:-doctor}"
