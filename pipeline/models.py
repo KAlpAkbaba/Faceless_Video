@@ -27,9 +27,15 @@ class TopicIdea(BaseModel):
 
 
 class Shot(BaseModel):
-    """One generated B-roll clip."""
+    """One generated clip."""
 
     beat_label: str = Field(description="Short label for the story beat this illustrates.")
+    characters: list[str] = Field(
+        description=(
+            "Which of the channel's characters appear in this shot, by name, most "
+            "important first. Empty for a shot with no characters in it."
+        )
+    )
     prompt: str = Field(
         description=(
             "Self-contained text-to-video prompt: subject, setting, lighting, camera move. "

@@ -33,6 +33,10 @@ channel:
     makes silly mistakes, never mean ones.
     They are friends of the same age. Nobody is the butt of a joke, nobody is
     excluded, and every problem is solved together.
+  # The cast, by name. Used to tell a character from a place in a reference
+  # filename (benny-lila-playroom.png), and to check that the writer only puts
+  # characters in a shot that actually exist.
+  cast: [Benny, Lila, Milo, Pip, Luna, Bobo]
   language: "en-US"
   audience: "children aged two to six, and the parents watching with them"
   tone: "warm, calm, encouraging, never scary, never sarcastic"
@@ -79,8 +83,11 @@ video:
   # image -> image-to-video from a reference still, which is the only way to
   #          keep the same character across shots and across videos
   generation: "image"
-  # Stills the character must match. Cycled across shots; add more for variety.
-  reference_dir: "assets/characters"
+  # The stills each shot is animated from. These become first frames, so they
+  # must look like frames of the show — characters in a real place, not on a
+  # white background. The character sheets in assets/characters are reference
+  # material for making these, and are never sent to the API.
+  frame_dir: "assets/frames"
   transition_seconds: 0.5      # 0 disables cross-fades and uses hard cuts
   concurrency: 3               # how many clips to generate at once
   generate_audio: false        # we lay our own narration over the footage

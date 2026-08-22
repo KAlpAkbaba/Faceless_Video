@@ -83,7 +83,7 @@ def script(title, words):
     return VideoScript(
         title=title,
         narration=" ".join(["word"] * words),
-        shots=[Shot(beat_label=f"beat {i}", prompt=f"prompt {i}") for i in range(3)],
+        shots=[Shot(beat_label=f"beat {i}", characters=["Benny"], prompt=f"prompt {i}") for i in range(3)],
         description="A description.",
         tags=["tag-one", "tag-two"],
         thumbnail_text="TEST CARD",

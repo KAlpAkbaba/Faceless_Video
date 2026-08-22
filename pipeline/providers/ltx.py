@@ -30,6 +30,11 @@ log = logging.getLogger(__name__)
 
 # Tried in order on the first call; whichever answers is reused for the rest.
 SUBMIT_PATHS = ("/text-to-video", "/generations/text-to-video", "/video/generations", "/generations")
+# Verified: /text-to-video works. The image endpoint is not verified yet, so it
+# keeps the same try-each-in-turn treatment.
+IMAGE_SUBMIT_PATHS = ("/image-to-video", "/generations/image-to-video", "/video/image-to-video")
+# Nor is the field the still goes in. Candidates, tried in order.
+IMAGE_FIELDS = ("image", "image_url", "input_image", "first_frame", "start_image", "init_image")
 STATUS_PATHS = ("/generations/{id}", "/text-to-video/{id}", "/jobs/{id}", "/requests/{id}")
 
 # A rejected request is never generated and never billed, so sweeping the
@@ -110,6 +115,12 @@ class LTXProvider:
         # Escape hatches: pin the exact paths once `probe` has revealed them.
         self._submit_path: str | None = os.environ.get("LTX_SUBMIT_PATH") or None
         self._status_path: str | None = os.environ.get("LTX_STATUS_PATH") or None
+        self._image_path: str | None = os.environ.get("LTX_IMAGE_PATH") or None
+        self._image_field: str = os.environ.get("LTX_IMAGE_FIELD") or IMAGE_FIELDS[0]
+
+        # Animating from a still is the only way to keep a character identical
+        # across shots, so it uses a different endpoint from plain prompting.
+        self.use_reference = str(config.get("video.generation", "text")) == "image"
 
         self.client = httpx.Client(
             headers={
@@ -121,6 +132,14 @@ class LTXProvider:
         )
 
     # -- request building --------------------------------------------------
+
+    def encode_reference(self, path: Path) -> str:
+        """A data URI for the still, since there is nowhere to host a file."""
+        import base64
+        import mimetypes
+
+        mime = mimetypes.guess_type(path.name)[0] or "image/png"
+        return f"data:{mime};base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
 
     def build_payload(self, request: ClipRequest) -> dict[str, Any]:
         """Assemble the generation body.
@@ -147,12 +166,19 @@ class LTXProvider:
             payload["negative_prompt"] = request.negative_prompt
         if request.seed is not None:
             payload["seed"] = request.seed
+        if request.reference_image is not None:
+            payload[self._image_field] = self.encode_reference(request.reference_image)
         return payload
 
     # -- HTTP --------------------------------------------------------------
 
     def _submit(self, payload: dict[str, Any]) -> dict[str, Any]:
-        paths = (self._submit_path,) if self._submit_path else SUBMIT_PATHS
+        if any(field in payload for field in IMAGE_FIELDS):
+            paths = (self._image_path,) if self._image_path else IMAGE_SUBMIT_PATHS
+        elif self._submit_path:
+            paths = (self._submit_path,)
+        else:
+            paths = SUBMIT_PATHS
         last_error: Exception | None = None
 
         for path in paths:
@@ -174,7 +200,10 @@ class LTXProvider:
                     "Check LTX_API_KEY in the Developer Console."
                 )
 
-            self._submit_path = path
+            if any(field in payload for field in IMAGE_FIELDS):
+                self._image_path = path
+            else:
+                self._submit_path = path
             if response.status_code < 400 and looks_like_video(response):
                 # The video came back inline; there is no job to track.
                 return {"_inline_video": response.content}
@@ -341,6 +370,62 @@ class LTXProvider:
             "accepted": accepted,
             "attempts": attempts,
         }
+
+    def discover_image_to_video(
+        self, prompt: str, *, seconds: float, reference: Path
+    ) -> dict[str, Any]:
+        """Find the image endpoint and the field the still belongs in.
+
+        Same reasoning as the text sweep: a rejected request is not generated
+        and not billed, so trying every combination costs nothing until one
+        works.
+        """
+        attempts: list[dict[str, Any]] = []
+        accepted: dict[str, Any] | None = None
+        encoded = self.encode_reference(reference)
+
+        for path in IMAGE_SUBMIT_PATHS:
+            for field_name in IMAGE_FIELDS:
+                request = ClipRequest(
+                    prompt=prompt,
+                    seconds=seconds,
+                    aspect_ratio="16:9",
+                    resolution="1080p",
+                    negative_prompt="",
+                    seed=None,
+                )
+                payload = self.build_payload(request)
+                payload.pop(self._image_field, None)
+                payload[field_name] = encoded
+
+                try:
+                    response = self.client.post(f"{self.base_url}{path}", json=payload)
+                except httpx.HTTPError as exc:
+                    attempts.append({"path": path, "field": field_name, "error": str(exc)})
+                    continue
+
+                if response.status_code < 400 and looks_like_video(response):
+                    body = f"<{len(response.content)} bytes of video>"
+                else:
+                    body = response.text[:300]
+                attempts.append(
+                    {"path": path, "field": field_name, "status": response.status_code, "body": body}
+                )
+                log.info("path=%-28s field=%-12s -> HTTP %s", path, field_name, response.status_code)
+
+                if response.status_code < 400:
+                    accepted = {"path": path, "field": field_name}
+                    log.info("ACCEPTED: LTX_IMAGE_PATH=%s LTX_IMAGE_FIELD=%s", path, field_name)
+                    break
+                if response.status_code == 404:
+                    # Wrong endpoint; the field makes no difference here.
+                    break
+            if accepted:
+                break
+
+        if not accepted:
+            log.error("No image-to-video endpoint and field combination was accepted.")
+        return {"base_url": self.base_url, "accepted": accepted, "attempts": attempts}
 
     def probe(self, prompt: str, *, resolution: str, seconds: float) -> dict[str, Any]:
         """Submit one job and report exactly what came back.

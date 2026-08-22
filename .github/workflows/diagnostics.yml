@@ -9,7 +9,7 @@ on:
       check:
         description: "Which check to run"
         type: choice
-        options: [doctor, plan, probe, probe-discover]
+        options: [doctor, plan, probe, probe-discover, probe-image]
         default: doctor
 
 permissions:
@@ -61,5 +61,6 @@ jobs:
         run: |
           case "${CHECK:-doctor}" in
             probe-discover) python -m pipeline.cli probe --discover ;;
+            probe-image)    python -m pipeline.cli probe --image ;;
             *)              python -m pipeline.cli "${CHECK:-doctor}" ;;
           esac

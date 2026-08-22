@@ -37,6 +37,9 @@ class ClipRequest:
     resolution: str
     negative_prompt: str
     seed: int | None
+    # When set, the clip is animated from this still, which becomes its first
+    # frame. This is what holds a character's appearance steady across shots.
+    reference_image: Path | None = None
 
 
 class VideoProvider(Protocol):

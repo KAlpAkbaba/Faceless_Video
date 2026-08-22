@@ -9,6 +9,7 @@ from pathlib import Path
 from .config import Config
 from .models import ClipAsset, Shot
 from .providers.base import ClipRequest, VideoGenerationError, VideoProvider
+from .references import ReferenceLibrary
 
 log = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ def generate_clips(
     resolution: str,
     prefix: str,
     concurrency: int = 3,
+    references: ReferenceLibrary | None = None,
 ) -> list[ClipAsset]:
     """Render every shot, in parallel, tolerating a few individual failures.
 
@@ -41,6 +43,14 @@ def generate_clips(
     seconds = float(config.get("video.clip_seconds", 8))
     style_suffix = str(config.get("video.style_suffix", ""))
     negative = str(config.get("video.negative_prompt", ""))
+
+    # Picked up front, not inside the worker: the library rotates through
+    # matches, and threads would make that order non-deterministic.
+    frames = (
+        {i: references.pick(shot.characters) for i, shot in enumerate(shots)}
+        if references
+        else {}
+    )
 
     def render(index: int, shot: Shot) -> ClipAsset:
         destination = work_dir / f"{prefix}_{index:02d}.mp4"
@@ -56,6 +66,7 @@ def generate_clips(
             negative_prompt=negative,
             # Deterministic per shot, so a retry of the same run reproduces the look.
             seed=abs(hash((prefix, index))) % 2_000_000_000,
+            reference_image=frames.get(index),
         )
         provider.generate(request, destination)
         return ClipAsset(index=index, path=destination, prompt=shot.prompt, seconds=seconds)
