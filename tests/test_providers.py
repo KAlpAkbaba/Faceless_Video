@@ -134,3 +134,26 @@ def test_payload_sends_explicit_pixels_not_a_label():
                     resolution="1080p", negative_prompt="", seed=1)
     )
     assert portrait["resolution"] == "1080x1920"
+
+
+def test_the_reference_still_goes_in_the_field_the_api_names():
+    """The API rejects anything else with 'image_uri is required'."""
+    import os
+    import tempfile
+    from pathlib import Path
+
+    from pipeline.config import Config
+    from pipeline.providers.base import ClipRequest
+    from pipeline.providers.ltx import IMAGE_FIELDS, LTXProvider
+
+    assert IMAGE_FIELDS[0] == "image_uri"
+
+    os.environ.setdefault("LTX_API_KEY", "test-key")
+    image = Path(tempfile.mkdtemp()) / "benny-garden.png"
+    image.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 32)
+
+    payload = LTXProvider(Config.load()).build_payload(
+        ClipRequest(prompt="Benny waves", seconds=8, aspect_ratio="16:9",
+                    resolution="1080p", negative_prompt="", seed=1, reference_image=image)
+    )
+    assert payload["image_uri"].startswith("data:image/png;base64,")

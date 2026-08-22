@@ -33,8 +33,10 @@ SUBMIT_PATHS = ("/text-to-video", "/generations/text-to-video", "/video/generati
 # Verified: /text-to-video works. The image endpoint is not verified yet, so it
 # keeps the same try-each-in-turn treatment.
 IMAGE_SUBMIT_PATHS = ("/image-to-video", "/generations/image-to-video", "/video/image-to-video")
-# Nor is the field the still goes in. Candidates, tried in order.
-IMAGE_FIELDS = ("image", "image_url", "input_image", "first_frame", "start_image", "init_image")
+# The field the still goes in. image_uri is verified — the API names it in its
+# own rejection: "Invalid input for 'image_uri': image_uri is required". The
+# rest stay as candidates for discovery against another deployment.
+IMAGE_FIELDS = ("image_uri", "image", "image_url", "input_image", "first_frame", "start_image")
 STATUS_PATHS = ("/generations/{id}", "/text-to-video/{id}", "/jobs/{id}", "/requests/{id}")
 
 # A rejected request is never generated and never billed, so sweeping the

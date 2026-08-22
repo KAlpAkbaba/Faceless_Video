@@ -111,7 +111,9 @@ def load_library(config) -> ReferenceLibrary:
         known = [part for part in parts if part in cast]
         if not known:
             log.warning(
-                "%s names none of the cast; it will only be used as a last resort.",
+                "%s names none of the cast, so every shot falls back to it regardless "
+                "of who is in the shot. Rename it after the characters it shows, for "
+                "example benny-lila-garden.png.",
                 path.name,
             )
         for part in known:
