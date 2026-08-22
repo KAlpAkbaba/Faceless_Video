@@ -223,6 +223,9 @@ make doctor     # config + anahtarlar + ffmpeg kontrolü
 make plan       # bu çalıştırma ne kadara mal olur — hiçbir şey harcamaz
 make probe      # LTX'e tek ucuz iş gönderir, ham yanıtı basar
 make auth       # YouTube OAuth bilgilerini üretir (tarayıcı gerekir)
+make storyboard # bir bölümü planlar ve fiyatlandırır — video üretmez
+make sample     # her karakter bir cümle söyler, kadroyu dinleyip ayarlamak için
+make voices     # son storyboard'u seslendirir — ücretsiz, video yok
 make dry        # tam render, YouTube'a yükleme yok
 make run        # tam üretim + yayın
 make test       # 68 test

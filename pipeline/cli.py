@@ -75,6 +75,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     story.add_argument("--output-dir", default=None)
 
+    voices = sub.add_parser(
+        "voices",
+        help="Synthesise dialogue so you can hear it. Generates no video and costs nothing.",
+    )
+    voices.add_argument(
+        "--from", dest="source", default=None,
+        help="A storyboard directory. Defaults to the most recent one under out/.",
+    )
+    voices.add_argument("--cut", choices=["longform", "shorts"], default="longform")
+    voices.add_argument(
+        "--sample", action="store_true",
+        help="Instead of an episode, have each character say one line, for auditioning "
+             "the cast against each other.",
+    )
+
     run_cmd = sub.add_parser("run", help="Run the full pipeline.")
     run_cmd.add_argument("--only", choices=["both", "longform", "shorts"], default="both")
     run_cmd.add_argument("--no-upload", action="store_true", help="Render locally, do not publish.")
@@ -300,6 +315,65 @@ def cmd_storyboard(config: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+SAMPLE_LINE = "Look! I found something. Can you see it too?"
+
+
+def cmd_voices(config: Config, args: argparse.Namespace) -> int:
+    """Hear the cast without rendering anything.
+
+    Voices are a taste decision, and taste needs listening rather than reading
+    a table of pitch offsets. Nothing here touches a video API.
+    """
+    from .models import ScriptLine, ScriptPackage
+    from .voice import synthesize_lines, voice_for
+
+    out_dir = REPO_ROOT / "out" / "voices"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.sample:
+        names = list(config.get("channel.cast", [])) + ["Narrator"]
+        lines = [ScriptLine(speaker=name, text=f"Hello, I am {name}. {SAMPLE_LINE}")
+                 for name in names]
+        destination = out_dir / "cast-sample.mp3"
+        print("Auditioning the cast:\n")
+        for name in names:
+            settings = voice_for(config, name)
+            print(f"  {name:<10} {settings['voice']:<24} "
+                  f"rate {settings['rate']:<6} pitch {settings['pitch']}")
+        print()
+    else:
+        source = Path(args.source) if args.source else _latest_storyboard()
+        if source is None:
+            print(
+                "No storyboard found. Run `storyboard` first, or pass --from <directory>.",
+                file=sys.stderr,
+            )
+            return 2
+        scripts = source / "scripts.json"
+        if not scripts.exists():
+            print(f"No scripts.json in {source}", file=sys.stderr)
+            return 2
+
+        package = ScriptPackage.model_validate_json(scripts.read_text(encoding="utf-8"))
+        script = package.longform if args.cut == "longform" else package.shorts
+        lines = script.lines
+        destination = out_dir / f"{args.cut}-{source.name}.mp3"
+        print(f"{script.title}\n{len(lines)} lines, speakers: {', '.join(script.speakers)}\n")
+
+    voiceover = synthesize_lines(config, lines, destination)
+    print(f"\n{voiceover.duration:.1f}s written to {destination}")
+    print("Listen, then adjust voice.cast in config.yaml and run this again.")
+    return 0
+
+
+def _latest_storyboard() -> Path | None:
+    out = REPO_ROOT / "out"
+    if not out.exists():
+        return None
+    candidates = [d for d in out.iterdir() if d.is_dir() and (d / "scripts.json").exists()]
+    return max(candidates, key=lambda d: d.stat().st_mtime, default=None)
+
+
 def cmd_run(config: Config, args: argparse.Namespace) -> int:
     options = RunOptions(
         only=args.only,
@@ -342,6 +416,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_probe(config, args)
         if args.command == "storyboard":
             return cmd_storyboard(config, args)
+        if args.command == "voices":
+            return cmd_voices(config, args)
         if args.command == "run":
             return cmd_run(config, args)
     except BudgetExceeded as exc:
