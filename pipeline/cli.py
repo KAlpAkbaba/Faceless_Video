@@ -325,7 +325,18 @@ def cmd_storyboard(config: Config, args: argparse.Namespace) -> int:
     return 0
 
 
-SAMPLE_LINE = "Look! I found something. Can you see it too?"
+# One line per emotion rather than the same line six times: the sample is for
+# judging whether the cast sounds like six different children, and whether the
+# emotions carry at all, which one flat sentence cannot show.
+SAMPLE_LINES = [
+    ("excited", "Look! Look what I found!"),
+    ("curious", "Hmm. I wonder what is inside."),
+    ("worried", "Oh no. I cannot find it anywhere."),
+    ("proud", "I did it! All by myself!"),
+    ("gentle", "It is all right. We can try again."),
+    ("playful", "You cannot catch me!"),
+    ("surprised", "Wow! Where did that come from?"),
+]
 
 
 def cmd_voices(config: Config, args: argparse.Namespace) -> int:
@@ -342,14 +353,25 @@ def cmd_voices(config: Config, args: argparse.Namespace) -> int:
 
     if args.sample:
         names = list(config.get("channel.cast", [])) + ["Narrator"]
-        lines = [ScriptLine(speaker=name, text=f"Hello, I am {name}. {SAMPLE_LINE}")
-                 for name in names]
-        destination = out_dir / "cast-sample.mp3"
+        lines = []
         print("Auditioning the cast:\n")
-        for name in names:
+        for index, name in enumerate(names):
+            emotion, text = SAMPLE_LINES[index % len(SAMPLE_LINES)]
+            lines.append(
+                ScriptLine(speaker=name, text=f"Hello, I am {name}. {text}", emotion=emotion)
+            )
             settings = voice_for(config, name)
-            print(f"  {name:<10} {settings['voice']:<24} "
+            print(f"  {name:<10} {emotion:<10} {settings['voice']:<24} "
                   f"rate {settings['rate']:<6} pitch {settings['pitch']}")
+
+        destination = out_dir / "cast-sample.mp3"
+
+        if config.get("voice.provider") == "edge":
+            print(
+                "\n  Note: edge-tts has no expression control, so every emotion above "
+                "will\n  sound the same. Switch voice.provider to elevenlabs to hear "
+                "them differ."
+            )
         print()
     else:
         source = Path(args.source) if args.source else _latest_storyboard()
