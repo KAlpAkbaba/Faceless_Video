@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 from .budget import BudgetExceeded, estimate_run_cost
-from .config import Config, ConfigError
+from .config import REPO_ROOT, Config, ConfigError
 from .run import CHARS_PER_SECOND, RunOptions, run
 
 
@@ -63,6 +63,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to the OAuth client secret JSON. Found automatically when omitted.",
     )
+
+    story = sub.add_parser(
+        "storyboard",
+        help="Write one episode and its shot list, with a costing. No video is generated.",
+    )
+    story.add_argument("--output-dir", default=None)
 
     run_cmd = sub.add_parser("run", help="Run the full pipeline.")
     run_cmd.add_argument("--only", choices=["both", "longform", "shorts"], default="both")
@@ -192,6 +198,70 @@ def cmd_auth(client_secret: str | None) -> int:
     return 0
 
 
+def cmd_storyboard(config: Config, args: argparse.Namespace) -> int:
+    """Plan one episode end to end without generating a frame.
+
+    The only spend is the two Claude calls. Everything the render would cost is
+    reported instead — which is the cheapest way to find out whether an episode
+    is affordable before committing to it.
+    """
+    from datetime import datetime, timezone
+
+    from .budget import shots_for_duration
+    from .state import History
+    from .writer import Writer, write_debug_bundle
+
+    history = History(config.history_path, keep_last=int(config.get("state.dedupe_last_n", 120)))
+    writer = Writer(config)
+    idea = writer.pick_topic(history.recent_titles(), history.recent_slugs())
+    package = writer.write_scripts(idea)
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    out = Path(args.output_dir) if args.output_dir else (REPO_ROOT / "out" / f"storyboard-{stamp}-{idea.slug}")
+    write_debug_bundle(out, idea, package)
+
+    clip_seconds = float(config.get("video.clip_seconds", 8))
+    reuse = bool(config.get("video.reuse_clips", True))
+    prices = config.get("budget.ltx_price_per_second", {}) or {}
+    model = str(config.require("video.model"))
+
+    for cut, script in (("EPISODE", package.longform), ("SHORT", package.shorts)):
+        words = len(script.narration.split())
+        print(f"\n{'=' * 72}\n{cut}: {script.title}\n{'=' * 72}")
+        print(f"{words} words of narration -> about {words / 2.5:.0f}s of runtime")
+        print(f"{len(script.shots)} shots\n")
+        for index, shot in enumerate(script.shots, 1):
+            print(f"{index:>3}. [{shot.beat_label}]\n     {shot.prompt}")
+
+    print(f"\n{'=' * 72}\nCOSTING\n{'=' * 72}")
+    print(f"clip length      {clip_seconds:g}s")
+    print(f"reuse_clips      {reuse}"
+          f"{'  (shots looped across the timeline)' if reuse else '  (every shot plays once)'}")
+
+    total_shots = len(package.longform.shots) + len(package.shorts.shots)
+    generated = total_shots * clip_seconds
+    print(f"shots            {len(package.longform.shots)} + {len(package.shorts.shots)}"
+          f" = {total_shots}")
+    print(f"generated video  {generated:.0f}s\n")
+
+    known = dict(prices)
+    known.setdefault(model, 0.13)
+    print(f"  {'model':<16} {'$/s':>6} {'per episode':>12} {'x6/week':>10} {'per month':>11}")
+    print("  " + "-" * 60)
+    for name, price in sorted(known.items(), key=lambda kv: -kv[1]):
+        episode = generated * price + 0.15
+        marker = "  <- configured" if name == model else ""
+        print(f"  {name:<16} {price:>6.2f} {episode:>11.2f}$ {episode * 6:>9.2f}$ "
+              f"{episode * 6 * 4.33:>10.0f}${marker}")
+
+    print(
+        "\nThese rates are unverified. Render this one episode, then read the real"
+        "\ncharge off the LTX billing page and correct budget.ltx_price_per_second."
+    )
+    print(f"\nWritten to {out}")
+    return 0
+
+
 def cmd_run(config: Config, args: argparse.Namespace) -> int:
     options = RunOptions(
         only=args.only,
@@ -231,6 +301,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_plan(config)
         if args.command == "probe":
             return cmd_probe(config, args)
+        if args.command == "storyboard":
+            return cmd_storyboard(config, args)
         if args.command == "run":
             return cmd_run(config, args)
     except BudgetExceeded as exc:

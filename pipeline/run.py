@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .assemble import assemble
-from .budget import enforce_budget, estimate_run_cost
+from .budget import enforce_budget, estimate_run_cost, shots_for_duration
 from .clips import generate_clips
 from .config import REPO_ROOT, Config
 from .media import require_ffmpeg
@@ -78,8 +78,34 @@ def run(config: Config, options: RunOptions | None = None) -> RunReport:
         shorts_strategy = "regenerate"
 
     # -- pre-flight cost check, before a single paid call ------------------
-    longform_clips = int(config.get("video.max_clips", 12)) if do_longform else 0
-    shorts_clips = int(config.get("shorts.max_clips", 6)) if (do_shorts and shorts_strategy == "regenerate") else 0
+    reuse = bool(config.get("video.reuse_clips", True))
+    clip_seconds = float(config.get("video.clip_seconds", 8))
+    transition = float(config.get("video.transition_seconds", 0.5))
+
+    if reuse:
+        # Clips are looped across the timeline, so the count is a quality knob.
+        longform_clips = int(config.get("video.max_clips", 12)) if do_longform else 0
+        shorts_clips = (
+            int(config.get("shorts.max_clips", 6))
+            if (do_shorts and shorts_strategy == "regenerate")
+            else 0
+        )
+    else:
+        # Every shot plays once, so the runtime dictates the count.
+        longform_clips = (
+            shots_for_duration(float(config.get("longform.target_seconds", 360)), clip_seconds, transition)
+            if do_longform
+            else 0
+        )
+        shorts_clips = (
+            shots_for_duration(float(config.get("shorts.target_seconds", 50)), clip_seconds, transition)
+            if do_shorts
+            else 0
+        )
+        log.info(
+            "reuse_clips is off: %d long-form and %d shorts shots derived from runtime",
+            longform_clips, shorts_clips,
+        )
     model = str(config.require("video.model"))
     prices = config.get("budget.ltx_price_per_second", {}) or {}
     price = float(prices.get(model, 0.04))
@@ -90,7 +116,7 @@ def run(config: Config, options: RunOptions | None = None) -> RunReport:
     estimate = estimate_run_cost(
         longform_clips=longform_clips,
         shorts_clips=shorts_clips,
-        clip_seconds=float(config.get("video.clip_seconds", 8)),
+        clip_seconds=clip_seconds,
         price_per_second=price,
         narration_chars=int(narration_seconds * CHARS_PER_SECOND),
         voice_provider=str(config.get("voice.provider", "edge")),
