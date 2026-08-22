@@ -32,6 +32,28 @@ log = logging.getLogger(__name__)
 SUBMIT_PATHS = ("/text-to-video", "/generations/text-to-video", "/video/generations", "/generations")
 STATUS_PATHS = ("/generations/{id}", "/text-to-video/{id}", "/jobs/{id}", "/requests/{id}")
 
+# Values to try when the configured resolution is rejected. A rejected request
+# is never generated and never billed, so the whole list costs nothing until
+# one is accepted — which makes brute force the cheapest way to learn an enum
+# whose documentation is unreachable.
+RESOLUTION_CANDIDATES: tuple[str | None, ...] = (
+    None,  # omit the field; width/height alone may be enough
+    "RESOLUTION_1080",
+    "RESOLUTION_720",
+    "RESOLUTION_480",
+    "1080",
+    "720",
+    "1920x1080",
+    "1280x720",
+    "FHD",
+    "HD",
+    "full_hd",
+    "hd",
+    "fhd",
+    "4K",
+    "2160",
+)
+
 RESOLUTION_PIXELS = {
     "480p": (854, 480),
     "720p": (1280, 720),
@@ -175,12 +197,64 @@ class LTXProvider:
 
         return download(self.client, url, destination)
 
+    def try_submit(self, payload: dict[str, Any]) -> tuple[int, str]:
+        """POST a payload and return (status, body) without raising.
+
+        Used by discovery, where a 4xx is the useful answer rather than a
+        failure.
+        """
+        path = self._submit_path or SUBMIT_PATHS[0]
+        response = self.client.post(f"{self.base_url}{path}", json=payload)
+        return response.status_code, response.text[:400]
+
+    def discover(self, prompt: str, *, seconds: float) -> dict[str, Any]:
+        """Find a resolution value the model accepts, reporting every attempt."""
+        attempts: list[dict[str, Any]] = []
+        accepted: dict[str, Any] | None = None
+
+        for candidate in RESOLUTION_CANDIDATES:
+            request = ClipRequest(
+                prompt=prompt,
+                seconds=seconds,
+                aspect_ratio="16:9",
+                resolution=candidate or "1080p",  # only feeds the pixel maths
+                negative_prompt="",
+                seed=None,
+            )
+            payload = self.build_payload(request)
+            if candidate is None:
+                payload.pop("resolution", None)
+            else:
+                payload["resolution"] = candidate
+
+            try:
+                status, body = self.try_submit(payload)
+            except httpx.HTTPError as exc:
+                attempts.append({"resolution": candidate, "error": str(exc)})
+                continue
+
+            attempts.append({"resolution": candidate, "status": status, "body": body})
+            log.info("resolution=%-16s -> HTTP %s", candidate, status)
+
+            if status < 400:
+                # This one was accepted, so it is also the only billed attempt.
+                accepted = {"resolution": candidate, "response": body}
+                break
+
+        return {
+            "base_url": self.base_url,
+            "submit_path": self._submit_path or SUBMIT_PATHS[0],
+            "model": self.model,
+            "accepted": accepted,
+            "attempts": attempts,
+        }
+
     def probe(self, prompt: str, *, resolution: str, seconds: float) -> dict[str, Any]:
         """Submit one job and report exactly what came back.
 
-        The resolution has to be one the model actually accepts — LTX 2.3
-        rejects anything below 1080p — so it comes from the caller rather than
-        being pinned to a cheap-looking value here.
+        The resolution has to be one the model actually accepts, and the
+        accepted spelling is not obvious, so it comes from the caller rather
+        than being pinned here. Use `probe --discover` to find it.
         """
         request = ClipRequest(
             prompt=prompt,

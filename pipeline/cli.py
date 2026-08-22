@@ -46,9 +46,16 @@ def build_parser() -> argparse.ArgumentParser:
     probe.add_argument(
         "--resolution",
         default=None,
-        help="Defaults to longform.resolution. LTX 2.3 accepts 1080p and above only.",
+        help="Defaults to longform.resolution. Use --discover if the API rejects it.",
     )
     probe.add_argument("--seconds", type=float, default=None, help="Defaults to video.clip_seconds.")
+    probe.add_argument("--model", default=None, help="Override video.model for this probe.")
+    probe.add_argument(
+        "--discover",
+        action="store_true",
+        help="Try each known resolution spelling until the API accepts one. "
+             "Rejected attempts are not billed.",
+    )
 
     auth = sub.add_parser("auth", help="Mint YouTube OAuth credentials. Run this locally, once.")
     auth.add_argument(
@@ -135,19 +142,29 @@ def cmd_plan(config: Config) -> int:
     return 0
 
 
-def cmd_probe(config: Config, prompt: str, resolution: str | None, seconds: float | None) -> int:
+def cmd_probe(config: Config, args: argparse.Namespace) -> int:
     from .providers import build_provider
+
+    if args.model:
+        config.data.setdefault("video", {})["model"] = args.model
 
     # The model decides which resolutions are legal, so probe with the one the
     # real run will use rather than a cheaper value it may reject outright.
-    resolution = resolution or str(config.get("longform.resolution", "1080p"))
-    seconds = seconds if seconds is not None else float(config.get("video.clip_seconds", 8))
+    resolution = args.resolution or str(config.get("longform.resolution", "1080p"))
+    seconds = args.seconds if args.seconds is not None else float(config.get("video.clip_seconds", 8))
 
     provider = build_provider(config)
-    print(f"Probing {config.get('video.provider')} / {config.get('video.model')} "
-          f"at {resolution}, {seconds:g}s\n")
+    mode = "discovering a working resolution" if args.discover else f"at {resolution}, {seconds:g}s"
+    print(f"Probing {config.get('video.provider')} / {config.get('video.model')} {mode}\n")
     try:
-        report = provider.probe(prompt, resolution=resolution, seconds=seconds)
+        if args.discover:
+            discover = getattr(provider, "discover", None)
+            if discover is None:
+                print(f"{provider.name} has no discovery mode.", file=sys.stderr)
+                return 2
+            report = discover(args.prompt, seconds=seconds)
+        else:
+            report = provider.probe(args.prompt, resolution=resolution, seconds=seconds)
     finally:
         close = getattr(provider, "close", None)
         if callable(close):
@@ -213,7 +230,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "plan":
             return cmd_plan(config)
         if args.command == "probe":
-            return cmd_probe(config, args.prompt, args.resolution, args.seconds)
+            return cmd_probe(config, args)
         if args.command == "run":
             return cmd_run(config, args)
     except BudgetExceeded as exc:

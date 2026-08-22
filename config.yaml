@@ -21,8 +21,9 @@ longform:
   enabled: true
   target_seconds: 360          # ~6 minutes of narration
   aspect_ratio: "16:9"
-  # LTX 2.3 rejects anything below 1080p. Higher tiers cost proportionally
-  # more per second: 1440p is double 1080p, 2160p is quadruple.
+  # The spelling the LTX API accepts here is model-specific and not obvious;
+  # `probe --discover` reports which values it takes. Higher tiers cost
+  # proportionally more per second.
   resolution: "1080p"
 
 shorts:
