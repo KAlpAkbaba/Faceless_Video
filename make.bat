@@ -27,6 +27,7 @@ if /I "%TARGET%"=="auth"   goto auth
 if /I "%TARGET%"=="storyboard" goto storyboard
 if /I "%TARGET%"=="voices" goto voices
 if /I "%TARGET%"=="sample" goto sample
+if /I "%TARGET%"=="listvoices" goto listvoices
 if /I "%TARGET%"=="dry"    goto dry
 if /I "%TARGET%"=="run"    goto runall
 echo Unknown target: %TARGET%
@@ -149,6 +150,10 @@ exit /b %errorlevel%
 "%PY%" -m pipeline.cli voices --sample
 exit /b %errorlevel%
 
+:listvoices
+"%PY%" -m pipeline.cli voices --list
+exit /b %errorlevel%
+
 :dry
 "%PY%" -m pipeline.cli run --no-upload
 exit /b %errorlevel%
@@ -175,6 +180,7 @@ echo   make auth      mint YouTube OAuth credentials (needs a browser)
 echo   make storyboard plan one episode and cost it, generating no video
 echo   make voices     voice the last storyboard so you can hear it
 echo   make sample     have each character say one line, to audition the cast
+echo   make listvoices print the ElevenLabs voices on your account
 echo   make dry       full render, nothing published
 echo   make run       full pipeline and publish
 echo   make test      run the test suite

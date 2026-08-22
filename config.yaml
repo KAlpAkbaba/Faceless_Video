@@ -137,8 +137,15 @@ voice:
   elevenlabs_cast: {}
     # Benny: "voice_id_here"
     # Lila:  "voice_id_here"
-  elevenlabs_model: "eleven_multilingual_v2"
+  # eleven_v3 is the model that understands audio tags — the [excited] and
+  # [worried] markers built from each line's emotion. Older models do not:
+  # they either ignore the tag or read it out loud, which is worse than having
+  # no emotion at all. Do not downgrade this without removing the tags.
+  elevenlabs_model: "eleven_v3"
   elevenlabs_voice_id: ""      # fallback for a speaker with no id above
+  # Passed through untouched when set. Left empty so the model's own defaults
+  # apply, which is the safer starting point.
+  elevenlabs_settings: {}
 
   default_voice: "en-US-AnaNeural"
   default_rate: "+4%"
