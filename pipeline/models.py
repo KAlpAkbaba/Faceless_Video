@@ -59,6 +59,13 @@ class ScriptLine(BaseModel):
             "marks, no stage directions, no emoji, no markdown."
         )
     )
+    emotion: str = Field(
+        description=(
+            "How the line is said, as one lowercase word: excited, curious, "
+            "worried, sad, surprised, proud, gentle, playful, or neutral. This "
+            "is what stops every line landing the same way."
+        )
+    )
 
 
 class VideoScript(BaseModel):

@@ -46,11 +46,22 @@ def test_a_cast_entry_without_a_voice_is_ignored():
     assert voice_for(config, "Benny")["rate"] == "+6%"
 
 
-def test_the_default_cast_uses_a_child_voice_for_the_children():
-    """An adult narrator reading every line is what this replaces."""
+def test_the_children_do_not_share_the_narrator_voice():
+    """An adult reading every line is exactly what the dialogue split replaces."""
     config = Config.load()
+    narrator = voice_for(config, "Narrator")["voice"]
     for name in ("Benny", "Lila", "Luna"):
-        assert voice_for(config, name)["voice"] == "en-US-AnaNeural"
+        assert voice_for(config, name)["voice"] != narrator
+
+
+def test_no_two_characters_are_voiced_identically():
+    """Six characters that sound the same are one character."""
+    config = Config.load()
+    settings = [
+        tuple(voice_for(config, name)[k] for k in ("voice", "rate", "pitch"))
+        for name in config.get("channel.cast", [])
+    ]
+    assert len(set(settings)) == len(settings)
 
 
 def test_every_configured_character_is_in_the_cast_list():

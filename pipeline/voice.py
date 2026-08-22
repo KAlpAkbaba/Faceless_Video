@@ -31,6 +31,7 @@ class VoiceError(RuntimeError):
 
 def voice_for(config: Config, speaker: str) -> dict[str, str]:
     """The voice settings for one character."""
+    eleven = (config.get("voice.elevenlabs_cast", {}) or {}).get(speaker)
     cast = config.get("voice.cast", {}) or {}
     entry = cast.get(speaker)
     if isinstance(entry, dict) and entry.get("voice"):
@@ -38,6 +39,7 @@ def voice_for(config: Config, speaker: str) -> dict[str, str]:
             "voice": str(entry["voice"]),
             "rate": str(entry.get("rate", "+0%")),
             "pitch": str(entry.get("pitch", "+0Hz")),
+            "voice_id": str(eleven) if eleven else None,
         }
     if speaker not in ("Narrator",):
         log.warning("No voice configured for %r; using the default.", speaker)
@@ -45,6 +47,7 @@ def voice_for(config: Config, speaker: str) -> dict[str, str]:
         "voice": str(config.get("voice.default_voice", "en-US-AnaNeural")),
         "rate": str(config.get("voice.default_rate", "+0%")),
         "pitch": str(config.get("voice.default_pitch", "+0Hz")),
+        "voice_id": str(eleven) if eleven else None,
     }
 
 
@@ -81,10 +84,7 @@ def synthesize_lines(config: Config, lines, destination: Path) -> Voiceover:
         settings = voice_for(config, line.speaker)
         piece = stage / f"{index:03d}_{_slug(line.speaker)}.mp3"
 
-        part = _synthesize_edge(
-            config, text, piece,
-            voice=settings["voice"], rate=settings["rate"], pitch=settings["pitch"],
-        )
+        part = _synthesize_line(config, line, text, piece, settings, provider)
         for word in part.words:
             words.append(WordTiming(word.word, word.start + cursor, word.end + cursor))
         segments.append(piece)
@@ -121,6 +121,42 @@ def synthesize_lines(config: Config, lines, destination: Path) -> Voiceover:
         ", ".join(sorted({l.speaker for l in lines})),
     )
     return Voiceover(audio_path=destination, duration=duration, words=words)
+
+
+# ElevenLabs reads these as performance direction rather than speaking them.
+EMOTION_TAGS = {
+    "excited", "curious", "worried", "sad", "surprised",
+    "proud", "gentle", "playful", "nervous", "happy",
+}
+
+
+def _synthesize_line(config: Config, line, text: str, piece: Path, settings: dict, provider: str):
+    """Voice one line with the provider in use.
+
+    This dispatch is the point of the function: synthesise_lines used to call
+    the edge backend directly, so selecting elevenlabs changed nothing about
+    how a dialogue was voiced.
+    """
+    if provider == "elevenlabs":
+        return _synthesize_elevenlabs(
+            config,
+            _with_emotion(text, getattr(line, "emotion", "")),
+            piece,
+            voice_id=settings.get("voice_id"),
+        )
+    # edge-tts has no expression control at all, so the emotion is dropped
+    # rather than spoken. Nothing is lost by omitting it; it was never heard.
+    return _synthesize_edge(
+        config, text, piece,
+        voice=settings["voice"], rate=settings["rate"], pitch=settings["pitch"],
+    )
+
+
+def _with_emotion(text: str, emotion: str) -> str:
+    emotion = (emotion or "").strip().lower()
+    if emotion and emotion != "neutral" and emotion in EMOTION_TAGS:
+        return f"[{emotion}] {text}"
+    return text
 
 
 def _slug(value: str) -> str:
@@ -209,11 +245,16 @@ def _synthesize_edge(
 # ---------------------------------------------------------------------------
 
 
-def _synthesize_elevenlabs(config: Config, text: str, destination: Path) -> Voiceover:
+def _synthesize_elevenlabs(
+    config: Config, text: str, destination: Path, *, voice_id: str | None = None
+) -> Voiceover:
     api_key = config.secrets.require("elevenlabs_api_key", "ELEVENLABS_API_KEY")
-    voice_id = str(config.get("voice.elevenlabs_voice_id", "")).strip()
+    voice_id = (voice_id or str(config.get("voice.elevenlabs_voice_id", ""))).strip()
     if not voice_id:
-        raise ConfigError("voice.elevenlabs_voice_id must be set when voice.provider is 'elevenlabs'.")
+        raise ConfigError(
+            "No ElevenLabs voice for this speaker. Add one per character under "
+            "voice.elevenlabs_cast, or set voice.elevenlabs_voice_id as a fallback."
+        )
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/with-timestamps"
