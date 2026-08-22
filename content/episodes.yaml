@@ -1,0 +1,315 @@
+# Editorial plan.
+#
+# The pipeline works through publish_order, skipping anything already recorded
+# in state/history.json. When the list runs out it falls back to inventing a
+# topic, so the queue can be extended at any time without touching code.
+#
+# hook is the first thing said, before any greeting or logo: the problem lands
+# in the first two seconds or the viewer is gone.
+# thumbnail describes ONE readable moment - two characters at most, one object,
+# one strong feeling. Preschoolers cannot read, so the picture carries it.
+publish_order:
+- 1
+- 11
+- 21
+- 2
+- 3
+- 12
+- 22
+- 5
+- 4
+- 14
+- 23
+- 7
+- 8
+- 16
+- 24
+- 10
+- 6
+- 9
+- 13
+- 15
+- 17
+- 18
+- 19
+- 20
+- 25
+- 26
+- 27
+- 28
+- 29
+- 30
+episodes:
+- id: 1
+  title: Learn Colors with Benny & Lila
+  characters:
+  - Benny
+  - Lila
+  theme: colors
+  keyword: learn colors for kids
+  thumbnail: three big colour boxes, Benny surprised
+  hook: Oh no! Where did all the colors go?
+- id: 2
+  title: Bobo Mixed Up the Colors!
+  characters:
+  - Bobo
+  - Benny
+  theme: colors
+  keyword: learn colors for toddlers
+  thumbnail: Bobo beside toys in the wrong colours
+  hook: Bobo mixed everything up!
+- id: 3
+  title: Learn Shapes with Pip
+  characters:
+  - Pip
+  - Lila
+  theme: shapes
+  keyword: learn shapes for kids
+  thumbnail: Pip's screen showing circle, triangle, star
+  hook: Can you find the missing shape?
+- id: 4
+  title: Milo Finds the Red Ball
+  characters:
+  - Milo
+  - Benny
+  theme: colors
+  keyword: red color for kids
+  thumbnail: Milo beside one big red ball
+  hook: Where is Milo's red ball?
+- id: 5
+  title: Rainbow Color Adventure
+  characters:
+  - Luna
+  - Lila
+  theme: colors
+  keyword: rainbow song for kids
+  thumbnail: a big rainbow with one stripe missing
+  hook: The rainbow is missing a color!
+- id: 6
+  title: Learn Big and Small
+  characters:
+  - Pip
+  - Benny
+  theme: shapes
+  keyword: big and small for kids
+  thumbnail: one huge ball, one tiny ball
+  hook: Which one is bigger?
+- id: 7
+  title: Find the Blue Toys
+  characters:
+  - Bobo
+  - Lila
+  theme: colors
+  keyword: blue color for toddlers
+  thumbnail: Bobo among blue toys
+  hook: Can you find all the blue toys?
+- id: 8
+  title: Color Train Adventure
+  characters:
+  - Benny
+  - Milo
+  theme: colors
+  keyword: color train for kids
+  thumbnail: a bright colour train with Milo aboard
+  hook: All aboard the color train!
+- id: 9
+  title: Learn Shapes at the Playground
+  characters:
+  - Benny
+  - Lila
+  theme: shapes
+  keyword: shapes for toddlers
+  thumbnail: a slide made of simple shapes
+  hook: Look! Shapes are everywhere!
+- id: 10
+  title: Pip's Number and Color Challenge
+  characters:
+  - Pip
+  theme: numbers
+  keyword: learn numbers for kids
+  thumbnail: Pip with numbers one to five and colours
+  hook: Can you beat Pip's challenge?
+- id: 11
+  title: Brush Your Teeth with Benny
+  characters:
+  - Benny
+  - Milo
+  theme: habits
+  keyword: brush your teeth song
+  thumbnail: a toothbrush and a foamy Milo
+  hook: Milo forgot to brush his teeth!
+- id: 12
+  title: Wash Your Hands Song
+  characters:
+  - Lila
+  - Milo
+  theme: habits
+  keyword: wash your hands song for kids
+  thumbnail: soap bubbles and hands
+  hook: Uh-oh, Milo's paws are dirty!
+- id: 13
+  title: Bobo Tries a New Food
+  characters:
+  - Benny
+  - Bobo
+  theme: habits
+  keyword: healthy food for kids
+  thumbnail: Bobo looking curiously at a bright fruit
+  hook: Bobo has never tried this before!
+- id: 14
+  title: Benny Goes to the Dentist
+  characters:
+  - Benny
+  - Pip
+  theme: habits
+  keyword: dentist for kids
+  thumbnail: Benny in the dentist chair, smiling
+  hook: Benny is going somewhere new today!
+- id: 15
+  title: Bedtime Routine for Kids
+  characters:
+  - Lila
+  - Milo
+  theme: habits
+  keyword: bedtime routine for toddlers
+  thumbnail: moon, bed and pyjamas
+  hook: Milo says he isn't sleepy...
+- id: 16
+  title: Clean Up Your Toys
+  characters:
+  - Bobo
+  - Lila
+  theme: habits
+  keyword: clean up song for kids
+  thumbnail: toys scattered everywhere
+  hook: Who made this giant mess?
+- id: 17
+  title: Get Dressed with Benny
+  characters:
+  - Benny
+  theme: habits
+  keyword: getting dressed for kids
+  thumbnail: Benny wearing clothes the wrong way
+  hook: Benny put his clothes on wrong!
+- id: 18
+  title: Bath Time Adventure
+  characters:
+  - Milo
+  - Benny
+  theme: habits
+  keyword: bath song for kids
+  thumbnail: a bubbly bath and a rubber duck
+  hook: Milo doesn't want a bath!
+- id: 19
+  title: Bobo and the Green Vegetables
+  characters:
+  - Bobo
+  - Luna
+  theme: habits
+  keyword: vegetables for kids
+  thumbnail: Bobo holding broccoli, curious
+  hook: Bobo has never seen broccoli before!
+- id: 20
+  title: Good Morning Routine
+  characters:
+  - Benny
+  - Lila
+  theme: habits
+  keyword: morning routine for kids
+  thumbnail: sun, clock, children waking
+  hook: Wake up! A new adventure starts!
+- id: 21
+  title: Bobo Lost the Numbers
+  characters:
+  - Bobo
+  - Pip
+  theme: numbers
+  keyword: learn numbers 1 to 10
+  thumbnail: numbers one to five with three missing
+  hook: Number three is missing!
+- id: 22
+  title: Milo's Toy Rescue
+  characters:
+  - Milo
+  - Benny
+  theme: problem
+  keyword: funny cartoon for kids
+  thumbnail: a toy wedged in a box
+  hook: Something is stuck!
+- id: 23
+  title: Pip's Battery Is Empty
+  characters:
+  - Pip
+  - Lila
+  theme: numbers
+  keyword: counting for kids
+  thumbnail: a low battery icon on Pip
+  hook: Pip only has one percent battery!
+- id: 24
+  title: The Colorful Door
+  characters:
+  - Benny
+  - Bobo
+  theme: colors
+  keyword: colors for kids cartoon
+  thumbnail: a bright door with colourful panels
+  hook: Look at all the colors on this door!
+- id: 25
+  title: Luna's Music Problem
+  characters:
+  - Luna
+  - Pip
+  theme: problem
+  keyword: music for kids
+  thumbnail: music notes and a puzzled Luna
+  hook: The music sounds wrong!
+- id: 26
+  title: Bobo Broke the Toy Train
+  characters:
+  - Bobo
+  - Benny
+  theme: problem
+  keyword: toy train cartoon for kids
+  thumbnail: a toy train in pieces
+  hook: Uh-oh, Bobo broke the train!
+- id: 27
+  title: Milo's Hiding Game
+  characters:
+  - Benny
+  - Lila
+  - Milo
+  theme: problem
+  keyword: hide and seek for kids
+  thumbnail: an empty collar with Milo's tail visible behind
+  hook: Milo is hiding! Can you see his tail?
+- id: 28
+  title: Find the Correct Animal
+  characters:
+  - Pip
+  - Benny
+  theme: problem
+  keyword: animal sounds for kids
+  thumbnail: three animals and a question mark
+  hook: Which animal says moo?
+- id: 29
+  title: Benny's Firefighter Adventure
+  characters:
+  - Benny
+  - Pip
+  theme: problem
+  keyword: fire truck for kids
+  thumbnail: a fire engine and a helmet
+  hook: Beep beep! The fire truck is coming!
+- id: 30
+  title: Bobo's Big Surprise
+  characters:
+  - Benny
+  - Lila
+  - Milo
+  - Pip
+  - Luna
+  - Bobo
+  theme: problem
+  keyword: surprise for kids
+  thumbnail: a big gift box and the whole cast
+  hook: What is inside Bobo's box?
