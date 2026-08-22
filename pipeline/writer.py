@@ -202,8 +202,12 @@ class Writer:
             output_format=ScriptPackage,
         )
         package = response.parsed_output
-        package.longform.narration = clean_narration(package.longform.narration)
-        package.shorts.narration = clean_narration(package.shorts.narration)
+        for cut in (package.longform, package.shorts):
+            for line in cut.lines:
+                line.text = clean_narration(line.text)
+                # A model asked for dialogue still sometimes prefixes the name.
+                line.text = re.sub(rf"^{re.escape(line.speaker)}\s*[:,-]\s*", "", line.text)
+            cut.lines = [line for line in cut.lines if line.text.strip()]
         log.info(
             "Scripts written: long-form %d words / %d shots, shorts %d words / %d shots",
             len(package.longform.narration.split()),

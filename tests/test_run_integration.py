@@ -11,7 +11,7 @@ import subprocess
 import pytest
 
 from pipeline.config import Config
-from pipeline.models import ScriptPackage, Shot, TopicIdea, VideoScript
+from pipeline.models import ScriptLine, ScriptPackage, Shot, TopicIdea, VideoScript
 from pipeline.run import RunOptions, run
 
 pytestmark = pytest.mark.skipif(
@@ -80,9 +80,17 @@ class FakeProvider:
 
 
 def script(title, words):
+    # Split the words across a handful of lines so the dialogue path is
+    # exercised rather than a single block of narration.
+    per_line = max(1, words // 6)
+    chunks = [["word"] * per_line for _ in range(words // per_line)]
+    speakers = ["Benny", "Lila"]
     return VideoScript(
         title=title,
-        narration=" ".join(["word"] * words),
+        lines=[
+            ScriptLine(speaker=speakers[i % 2], text=" ".join(chunk))
+            for i, chunk in enumerate(chunks)
+        ],
         shots=[Shot(beat_label=f"beat {i}", characters=["Benny"], prompt=f"prompt {i}") for i in range(3)],
         description="A description.",
         tags=["tag-one", "tag-two"],

@@ -18,7 +18,7 @@ from .providers.ltx import resolve_dimensions
 from .references import load_library
 from .state import History
 from .thumbnail import build_thumbnail
-from .voice import synthesize
+from .voice import synthesize_lines
 from .writer import Writer, write_debug_bundle
 
 log = logging.getLogger(__name__)
@@ -198,7 +198,7 @@ def run(config: Config, options: RunOptions | None = None) -> RunReport:
             resolution = str(config.get("longform.resolution", "1080p"))
             width, height = resolve_dimensions(resolution, aspect)
 
-            voiceover = synthesize(config, package.longform.narration, work_dir / "longform" / "narration.mp3")
+            voiceover = synthesize_lines(config, package.longform.lines, work_dir / "longform" / "narration.mp3")
             shots = trim_shots(package.longform.shots, voiceover.duration, reuse, longform_clips,
                                clip_seconds, transition, "long-form", options.max_shots)
             longform_clip_assets = generate_clips(
@@ -237,7 +237,7 @@ def run(config: Config, options: RunOptions | None = None) -> RunReport:
             resolution = str(config.get("longform.resolution", "1080p"))
             width, height = resolve_dimensions(resolution, aspect)
 
-            voiceover = synthesize(config, package.shorts.narration, work_dir / "shorts" / "narration.mp3")
+            voiceover = synthesize_lines(config, package.shorts.lines, work_dir / "shorts" / "narration.mp3")
             if shorts_strategy == "regenerate":
                 shorts_assets = generate_clips(
                     config,

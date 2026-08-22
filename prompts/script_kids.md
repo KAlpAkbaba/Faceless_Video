@@ -49,8 +49,9 @@ HOW TO WRITE FOR A THREE-YEAR-OLD
 - Ask the child gentle questions and leave a beat: "Can you see the red ball?"
 - Count out loud, slowly, when counting. Name colours when they appear.
 - Warm and calm. Never sarcastic, never teasing, never scary.
-- Plain prose only. No headings, bullets, markdown, emoji, speaker labels,
-  stage directions. Every character is spoken aloud.
+- Each line is only the words said. No name prefix (the speaker field carries
+  that), no quotation marks, no stage directions, no markdown, no emoji.
+  Every character in the text is spoken aloud.
 - Write numbers as words: "three", not "3".
 - No rhyming forced into awkwardness; natural speech beats a bad rhyme.
 - End warmly. Say goodbye.

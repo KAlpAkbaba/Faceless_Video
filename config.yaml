@@ -101,12 +101,40 @@ video:
   negative_prompt: "text, captions, watermark, logo, distorted hands, extra limbs, low quality, jitter"
 
 voice:
-  provider: "edge"             # edge (free) | elevenlabs
-  edge_voice: "en-US-AndrewMultilingualNeural"
-  edge_rate: "+6%"
-  edge_pitch: "+0Hz"
-  elevenlabs_voice_id: ""
+  provider: "edge"             # edge (free) | elevenlabs | silent
+
+  # One voice per character. The characters speak their own lines, so a single
+  # adult narrator reading everything is exactly what this avoids.
+  #
+  # en-US-AnaNeural is Microsoft's child voice and the only genuinely young one
+  # in the free set, so the cast is built from it with pitch and rate shifting
+  # each character apart. Not ideal — real casting would use six voices — but a
+  # child voice pitched two ways reads as two children, where two adult voices
+  # read as two adults whatever you do to them.
+  #
+  # Listen before committing to these. Voices are a taste decision and the
+  # numbers below are a starting point, not an answer.
+  cast:
+    Benny:    { voice: "en-US-AnaNeural", rate: "+14%", pitch: "+18Hz" }
+    Lila:     { voice: "en-US-AnaNeural", rate: "+4%",  pitch: "+2Hz" }
+    Luna:     { voice: "en-US-AnaNeural", rate: "+8%",  pitch: "+10Hz" }
+    Pip:      { voice: "en-US-AnaNeural", rate: "+0%",  pitch: "+28Hz" }
+    Bobo:     { voice: "en-US-AnaNeural", rate: "-6%",  pitch: "-12Hz" }
+    Milo:     { voice: "en-US-AnaNeural", rate: "+20%", pitch: "+24Hz" }
+    Narrator: { voice: "en-US-JennyNeural", rate: "+0%", pitch: "+0Hz" }
+
+  # Used for any speaker not listed above.
+  default_voice: "en-US-AnaNeural"
+  default_rate: "+6%"
+  default_pitch: "+0Hz"
+
+  # Silence between lines. A beat after a question is where a child answers.
+  gap_seconds: 0.28
+  question_gap_seconds: 0.75
+
   elevenlabs_model: "eleven_multilingual_v2"
+  # Per-character ElevenLabs voice ids, when provider is elevenlabs.
+  elevenlabs_cast: {}
 
 captions:
   enabled_longform: false      # long-form relies on YouTube's own captions

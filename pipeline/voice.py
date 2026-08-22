@@ -29,6 +29,104 @@ class VoiceError(RuntimeError):
     """Raised when narration cannot be synthesised."""
 
 
+def voice_for(config: Config, speaker: str) -> dict[str, str]:
+    """The voice settings for one character."""
+    cast = config.get("voice.cast", {}) or {}
+    entry = cast.get(speaker)
+    if isinstance(entry, dict) and entry.get("voice"):
+        return {
+            "voice": str(entry["voice"]),
+            "rate": str(entry.get("rate", "+0%")),
+            "pitch": str(entry.get("pitch", "+0Hz")),
+        }
+    if speaker not in ("Narrator",):
+        log.warning("No voice configured for %r; using the default.", speaker)
+    return {
+        "voice": str(config.get("voice.default_voice", "en-US-AnaNeural")),
+        "rate": str(config.get("voice.default_rate", "+0%")),
+        "pitch": str(config.get("voice.default_pitch", "+0Hz")),
+    }
+
+
+def synthesize_lines(config: Config, lines, destination: Path) -> Voiceover:
+    """Voice a dialogue, one character at a time, into a single track.
+
+    Each line is synthesised with its own character's voice and the pieces are
+    joined with a beat of silence between them — longer after a question, since
+    that pause is where a child answers.
+    """
+    if not lines:
+        raise VoiceError("The script has no spoken lines.")
+
+    provider = config.get("voice.provider", "edge")
+    if provider == "silent":
+        return _synthesize_silent(config, " ".join(l.text for l in lines), destination)
+
+    from .media import duration_seconds, run_ffmpeg
+
+    stage = destination.parent / f"{destination.stem}_lines"
+    stage.mkdir(parents=True, exist_ok=True)
+
+    gap = float(config.get("voice.gap_seconds", 0.28))
+    question_gap = float(config.get("voice.question_gap_seconds", 0.75))
+
+    segments: list[Path] = []
+    words: list[WordTiming] = []
+    cursor = 0.0
+
+    for index, line in enumerate(lines):
+        text = line.text.strip()
+        if not text:
+            continue
+        settings = voice_for(config, line.speaker)
+        piece = stage / f"{index:03d}_{_slug(line.speaker)}.mp3"
+
+        part = _synthesize_edge(
+            config, text, piece,
+            voice=settings["voice"], rate=settings["rate"], pitch=settings["pitch"],
+        )
+        for word in part.words:
+            words.append(WordTiming(word.word, word.start + cursor, word.end + cursor))
+        segments.append(piece)
+        cursor += part.duration
+
+        # A pause after a question is not decoration; it is the turn the child
+        # is being given.
+        pause = question_gap if text.rstrip().endswith("?") else gap
+        if index < len(lines) - 1 and pause > 0:
+            silence = stage / f"{index:03d}_gap.mp3"
+            if not silence.exists():
+                run_ffmpeg(
+                    ["-f", "lavfi", "-i", "anullsrc=channel_layout=mono:sample_rate=24000",
+                     "-t", f"{pause:.3f}", "-c:a", "libmp3lame", "-b:a", "64k", str(silence)],
+                    label="line gap",
+                )
+            segments.append(silence)
+            cursor += pause
+
+    listing = stage / "lines.txt"
+    listing.write_text(
+        "".join(f"file '{p.resolve().as_posix()}'\n" for p in segments), encoding="utf-8"
+    )
+    run_ffmpeg(
+        ["-f", "concat", "-safe", "0", "-i", str(listing),
+         "-c:a", "libmp3lame", "-b:a", "128k", "-ar", "24000", str(destination)],
+        label="join dialogue",
+    )
+
+    duration = duration_seconds(destination)
+    log.info(
+        "Dialogue: %.1fs across %d lines, %d word timings, voices=%s",
+        duration, len(lines), len(words),
+        ", ".join(sorted({l.speaker for l in lines})),
+    )
+    return Voiceover(audio_path=destination, duration=duration, words=words)
+
+
+def _slug(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower()) or "speaker"
+
+
 def synthesize(config: Config, text: str, destination: Path) -> Voiceover:
     provider = config.get("voice.provider", "edge")
     if provider == "edge":
@@ -45,12 +143,20 @@ def synthesize(config: Config, text: str, destination: Path) -> Voiceover:
 # ---------------------------------------------------------------------------
 
 
-def _synthesize_edge(config: Config, text: str, destination: Path) -> Voiceover:
+def _synthesize_edge(
+    config: Config,
+    text: str,
+    destination: Path,
+    *,
+    voice: str | None = None,
+    rate: str | None = None,
+    pitch: str | None = None,
+) -> Voiceover:
     import edge_tts
 
-    voice = str(config.get("voice.edge_voice", "en-US-AndrewMultilingualNeural"))
-    rate = str(config.get("voice.edge_rate", "+0%"))
-    pitch = str(config.get("voice.edge_pitch", "+0Hz"))
+    voice = voice or str(config.get("voice.default_voice", "en-US-AnaNeural"))
+    rate = rate or str(config.get("voice.default_rate", "+0%"))
+    pitch = pitch or str(config.get("voice.default_pitch", "+0Hz"))
     destination.parent.mkdir(parents=True, exist_ok=True)
 
     async def run() -> list[WordTiming]:
@@ -94,7 +200,7 @@ def _synthesize_edge(config: Config, text: str, destination: Path) -> Voiceover:
         raise VoiceError(f"edge-tts failed after 3 attempts: {last_error}") from last_error
 
     duration = duration_seconds(destination)
-    log.info("Narration: %.1fs, %d word timings, voice=%s", duration, len(words), voice)
+    log.debug("Line: %.1fs, %d words, voice=%s", duration, len(words), voice)
     return Voiceover(audio_path=destination, duration=duration, words=words)
 
 
