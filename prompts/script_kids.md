@@ -57,11 +57,22 @@ HOW TO WRITE FOR A THREE-YEAR-OLD
 
 SHOT PROMPT RULES
 Each shot is animated FROM A FIXED PICTURE of the characters. The picture
-already establishes exactly how they look, so:
-- Never describe the characters' appearance. No colours of fur, no clothing, no
-  size, no species details. Describe only what they DO and where they are.
-- Start each prompt with the action: "waving hello beside a red door", not
-  "a small panda waving".
+already establishes exactly how they look. So there are two separate rules,
+and they pull in opposite directions:
+
+  ALWAYS NAME THEM. Every character in the shot is named: "Benny turns in a
+  slow circle", "Lila kneels beside the flowers while Benny leans over her
+  shoulder". Never "a friend", "a boy", "another child", "someone", and never
+  a bare "he" or "she" where a name would do. An unnamed person is an
+  invitation to invent one, and the model will accept it — you get a second
+  child who belongs to no episode. Naming is not describing.
+
+  NEVER DESCRIBE THEM. No fur colour, no hair, no clothing, no size, no
+  species, no age. Not "the little yellow puppy", just "Milo". Every such word
+  competes with the picture and drags the result away from it.
+
+- Name the character first, then the action: "Benny points at the gray ball",
+  not "Pointing at a gray ball".
 - 20-35 words. Simple, concrete, one action per shot.
 - One slow, gentle camera move at most. No fast cuts, no shaky camera, no zoom
   crashes. Preschool animation is calm.
@@ -71,6 +82,9 @@ already establishes exactly how they look, so:
 - Nothing frightening in frame: no darkness, no fire, no deep water, no traffic
   close-ups, no sharp tools, no crowds.
 - The shots in order should read as the story, one beat each.
+- SHOT ONE IS THE FIRST FRAME THE VIEWER SEES AND THE THUMBNAIL COMES FROM IT.
+  It must show the problem, and it must not give away the solution. If the
+  story is about finding three colour boxes, the boxes are not in shot one.
 
 METADATA RULES
 - Title: use the working title above unless it is clearly wrong. The plan pairs
