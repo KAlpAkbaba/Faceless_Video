@@ -11,6 +11,7 @@ import anthropic
 
 from .config import REPO_ROOT, Config, ConfigError
 from .models import ScriptPackage, TopicIdea
+from .plan import EpisodePlan, PlannedEpisode, load_plan
 
 log = logging.getLogger(__name__)
 
@@ -68,6 +69,8 @@ class Writer:
         if mode not in PROMPT_SETS:
             raise ConfigError(f"content_mode must be one of {sorted(PROMPT_SETS)}, got {mode!r}")
         self.ideation_template, self.script_template = PROMPT_SETS[mode]
+        self.plan: EpisodePlan = load_plan(config.get("content_plan"))
+        self.planned: PlannedEpisode | None = None
         log.info("Content mode: %s", mode)
         if client is not None:
             self.client = client
@@ -81,6 +84,26 @@ class Writer:
     # -- step 1: pick a topic ---------------------------------------------
 
     def pick_topic(self, recent_titles: list[str], avoid_slugs: set[str]) -> TopicIdea:
+        # A planned episode wins over invention, and costs nothing: the
+        # editorial decisions were made in advance, so there is no call to make.
+        planned = self.plan.next_episode(avoid_slugs)
+        if planned is not None:
+            self.planned = planned
+            log.info(
+                "Episode %d of the plan: %s (%d left in the queue)",
+                planned.id, planned.title, self.plan.remaining(avoid_slugs),
+            )
+            return TopicIdea(
+                working_title=planned.title,
+                slug=planned.slug,
+                angle=f"{planned.theme}: {planned.keyword}",
+                hook_promise=planned.hook,
+                why_it_travels=f"Searched for as '{planned.keyword}'.",
+                key_facts=[planned.hook, f"Thumbnail moment: {planned.thumbnail}"],
+                fact_risk="none",
+            )
+
+        self.planned = None
         history_block = "\n".join(f"- {t}" for t in recent_titles[-60:]) or "- (nothing yet)"
         banned = ", ".join(self.config.get("channel.banned_topics", [])) or "(none)"
 
@@ -160,6 +183,11 @@ class Writer:
             HOOK_PROMISE=idea.hook_promise,
             KEY_FACTS="; ".join(idea.key_facts) or "(none supplied)",
             FACT_RISK=idea.fact_risk or "none",
+            HOOK=(self.planned.hook if self.planned else idea.hook_promise),
+            CAST_IN_EPISODE=(
+                ", ".join(self.planned.characters) if self.planned else "any of the cast"
+            ),
+            THUMBNAIL=(self.planned.thumbnail if self.planned else "(choose one clear moment)"),
             LONGFORM_WORDS=str(target_words(longform_seconds)),
             SHORTS_WORDS=str(target_words(shorts_seconds)),
             LONGFORM_SHOTS=str(self.shot_count(longform_seconds, "video.max_clips", 12)),

@@ -9,7 +9,7 @@ on:
       check:
         description: "Which check to run"
         type: choice
-        options: [doctor, plan, probe, probe-discover, probe-image]
+        options: [doctor, plan, storyboard, probe, probe-discover, probe-image]
         default: doctor
 
 permissions:
@@ -59,8 +59,19 @@ jobs:
           # evaluates to true in expression syntax.
           CHECK: ${{ inputs.check }}
         run: |
+          set -o pipefail
           case "${CHECK:-doctor}" in
             probe-discover) python -m pipeline.cli probe --discover ;;
             probe-image)    python -m pipeline.cli probe --image ;;
+            storyboard)     python -m pipeline.cli storyboard ;;
             *)              python -m pipeline.cli "${CHECK:-doctor}" ;;
           esac
+
+      - name: Upload the storyboard
+        if: always() && inputs.check == 'storyboard'
+        uses: actions/upload-artifact@v4
+        with:
+          name: storyboard
+          retention-days: 30
+          if-no-files-found: ignore
+          path: out/**
