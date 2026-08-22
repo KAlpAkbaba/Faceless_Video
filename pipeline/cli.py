@@ -85,6 +85,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     voices.add_argument("--cut", choices=["longform", "shorts"], default="longform")
     voices.add_argument(
+        "--list", dest="list_voices", action="store_true",
+        help="Print the ElevenLabs voices on your account, with their ids.",
+    )
+    voices.add_argument(
         "--sample", action="store_true",
         help="Instead of an episode, have each character say one line, for auditioning "
              "the cast against each other.",
@@ -347,6 +351,26 @@ def cmd_voices(config: Config, args: argparse.Namespace) -> int:
     """
     from .models import ScriptLine, ScriptPackage
     from .voice import synthesize_lines, voice_for
+
+    if args.list_voices:
+        from .voice import list_elevenlabs_voices
+
+        available = list_elevenlabs_voices(config)
+        if not available:
+            print("The account has no voices.")
+            return 1
+        print(f"{len(available)} voices on this account:\n")
+        print(f"  {'voice_id':<24} {'name':<26} labels")
+        print("  " + "-" * 76)
+        for voice in available:
+            labels = voice.get("labels") or {}
+            summary = ", ".join(f"{k}={v}" for k, v in sorted(labels.items()))
+            print(f"  {voice.get('voice_id', ''):<24} {voice.get('name', ''):<26} {summary}")
+        print(
+            "\nPut one id per character under voice.elevenlabs_cast in config.yaml. "
+            "Six\ndifferent voices is the point — do not reuse one id across characters."
+        )
+        return 0
 
     out_dir = REPO_ROOT / "out" / "voices"
     out_dir.mkdir(parents=True, exist_ok=True)

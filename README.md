@@ -226,6 +226,7 @@ make auth       # YouTube OAuth bilgilerini üretir (tarayıcı gerekir)
 make storyboard # bir bölümü planlar ve fiyatlandırır — video üretmez
 make sample     # her karakter bir cümle söyler, kadroyu dinleyip ayarlamak için
 make voices     # son storyboard'u seslendirir — ücretsiz, video yok
+make listvoices # hesabındaki ElevenLabs seslerini kimlikleriyle listeler
 make dry        # tam render, YouTube'a yükleme yok
 make run        # tam üretim + yayın
 make test       # 68 test

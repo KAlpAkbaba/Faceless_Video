@@ -245,6 +245,12 @@ def _synthesize_edge(
 # ---------------------------------------------------------------------------
 
 
+ELEVEN_BASE = "https://api.elevenlabs.io/v1"
+# Timestamps give word-accurate captions. If the model in use does not offer
+# them, the plain endpoint still returns audio and the timings are estimated.
+ELEVEN_TTS_PATHS = ("/with-timestamps", "")
+
+
 def _synthesize_elevenlabs(
     config: Config, text: str, destination: Path, *, voice_id: str | None = None
 ) -> Voiceover:
@@ -253,36 +259,76 @@ def _synthesize_elevenlabs(
     if not voice_id:
         raise ConfigError(
             "No ElevenLabs voice for this speaker. Add one per character under "
-            "voice.elevenlabs_cast, or set voice.elevenlabs_voice_id as a fallback."
+            "voice.elevenlabs_cast, or set voice.elevenlabs_voice_id as a fallback. "
+            "`voices --list` prints the ids on your account."
         )
 
     destination.parent.mkdir(parents=True, exist_ok=True)
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/with-timestamps"
-    payload = {
+    payload: dict = {
         "text": text,
-        "model_id": str(config.get("voice.elevenlabs_model", "eleven_multilingual_v2")),
+        "model_id": str(config.get("voice.elevenlabs_model", "eleven_v3")),
     }
+    settings = config.get("voice.elevenlabs_settings") or {}
+    if settings:
+        payload["voice_settings"] = dict(settings)
 
+    last_error = ""
     with httpx.Client(timeout=httpx.Timeout(300.0, connect=20.0)) as client:
-        response = client.post(url, headers={"xi-api-key": api_key}, json=payload)
-        if response.status_code >= 400:
-            raise VoiceError(f"ElevenLabs returned HTTP {response.status_code}: {response.text[:400]}")
-        body = response.json()
+        for suffix in ELEVEN_TTS_PATHS:
+            response = client.post(
+                f"{ELEVEN_BASE}/text-to-speech/{voice_id}{suffix}",
+                headers={"xi-api-key": api_key},
+                json=payload,
+            )
+            if response.status_code in (401, 403):
+                raise VoiceError(
+                    f"ElevenLabs rejected the API key (HTTP {response.status_code})."
+                )
+            if response.status_code >= 400:
+                last_error = f"HTTP {response.status_code}: {response.text[:300]}"
+                log.debug("ElevenLabs %s failed: %s", suffix or "(plain)", last_error)
+                continue
 
-    audio_b64 = body.get("audio_base64")
-    if not audio_b64:
-        raise VoiceError("ElevenLabs response contained no audio_base64 field.")
-    destination.write_bytes(base64.b64decode(audio_b64))
+            if suffix:
+                body = response.json()
+                audio = body.get("audio_base64")
+                if not audio:
+                    last_error = "with-timestamps returned no audio_base64"
+                    continue
+                destination.write_bytes(base64.b64decode(audio))
+                alignment = body.get("alignment") or body.get("normalized_alignment") or {}
+                words = _words_from_character_alignment(
+                    alignment.get("characters", []),
+                    alignment.get("character_start_times_seconds", []),
+                    alignment.get("character_end_times_seconds", []),
+                )
+            else:
+                destination.write_bytes(response.content)
+                words = []
 
-    alignment = body.get("alignment") or body.get("normalized_alignment") or {}
-    words = _words_from_character_alignment(
-        alignment.get("characters", []),
-        alignment.get("character_start_times_seconds", []),
-        alignment.get("character_end_times_seconds", []),
+            duration = duration_seconds(destination)
+            if not words:
+                # Estimated timings drift on long text, which is one more reason
+                # a line is synthesised on its own rather than a whole episode.
+                words = estimate_word_timings(text, duration)
+                log.debug("No timestamps from ElevenLabs; estimating from text.")
+            return Voiceover(audio_path=destination, duration=duration, words=words)
+
+    raise VoiceError(
+        f"ElevenLabs would not synthesise this line. Last response: {last_error}\n"
+        "If the model id is wrong the error says so; `voices --list` shows what the "
+        "account can use."
     )
-    duration = duration_seconds(destination)
-    log.info("Narration: %.1fs, %d word timings, voice=elevenlabs/%s", duration, len(words), voice_id)
-    return Voiceover(audio_path=destination, duration=duration, words=words)
+
+
+def list_elevenlabs_voices(config: Config) -> list[dict]:
+    """The voices available on this account, for choosing ids."""
+    api_key = config.secrets.require("elevenlabs_api_key", "ELEVENLABS_API_KEY")
+    with httpx.Client(timeout=60.0) as client:
+        response = client.get(f"{ELEVEN_BASE}/voices", headers={"xi-api-key": api_key})
+    if response.status_code >= 400:
+        raise VoiceError(f"Could not list voices: HTTP {response.status_code} {response.text[:200]}")
+    return response.json().get("voices", [])
 
 
 def _words_from_character_alignment(

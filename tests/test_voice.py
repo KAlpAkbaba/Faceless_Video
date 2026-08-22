@@ -116,7 +116,7 @@ def test_the_sample_command_runs_end_to_end(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "REPO_ROOT", tmp_path)
 
     code = cli.cmd_voices(
-        config, argparse.Namespace(source=None, cut="longform", sample=True)
+        config, argparse.Namespace(source=None, cut="longform", sample=True, list_voices=False)
     )
 
     assert code == 0
@@ -135,6 +135,28 @@ def test_voices_without_a_storyboard_explains_itself(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "REPO_ROOT", tmp_path)
 
     code = cli.cmd_voices(
-        config, argparse.Namespace(source=None, cut="longform", sample=False)
+        config, argparse.Namespace(source=None, cut="longform", sample=False, list_voices=False)
     )
     assert code == 2
+
+
+def test_the_model_is_one_that_understands_audio_tags():
+    """Emotions are sent as [excited]-style tags, which only eleven_v3 reads.
+
+    An older model either ignores the tag or speaks it aloud, and speaking it
+    is worse than having no emotion at all.
+    """
+    config = Config.load()
+    assert config.get("voice.elevenlabs_model") == "eleven_v3"
+
+
+def test_timestamps_are_preferred_but_not_required():
+    """Word-accurate captions come from the timestamps endpoint.
+
+    A model that does not offer them must still produce audio rather than
+    failing the run, with timings estimated instead.
+    """
+    from pipeline.voice import ELEVEN_TTS_PATHS
+
+    assert ELEVEN_TTS_PATHS[0] == "/with-timestamps"
+    assert "" in ELEVEN_TTS_PATHS
