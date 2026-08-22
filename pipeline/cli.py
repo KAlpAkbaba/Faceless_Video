@@ -260,8 +260,14 @@ def cmd_storyboard(config: Config, args: argparse.Namespace) -> int:
     for cut, script in (("EPISODE", package.longform), ("SHORT", package.shorts)):
         words = len(script.narration.split())
         print(f"\n{'=' * 72}\n{cut}: {script.title}\n{'=' * 72}")
-        print(f"{words} words of narration -> about {words / 2.5:.0f}s of runtime")
+        print(f"{words} words across {len(script.lines)} lines "
+              f"-> about {words / 2.5:.0f}s of runtime")
+        print(f"speakers: {', '.join(script.speakers)}")
         print(f"{len(script.shots)} shots\n")
+        print("--- script ---")
+        for line in script.lines:
+            print(f"  {line.speaker + ':':<10} {line.text}")
+        print("\n--- shots ---")
         for index, shot in enumerate(script.shots, 1):
             print(f"{index:>3}. [{shot.beat_label}]\n     {shot.prompt}")
 

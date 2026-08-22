@@ -44,20 +44,47 @@ class Shot(BaseModel):
     )
 
 
+class ScriptLine(BaseModel):
+    """One spoken line, and who says it."""
+
+    speaker: str = Field(
+        description=(
+            "Which character says this line, by name. Use 'Narrator' only for the "
+            "rare line no character could say."
+        )
+    )
+    text: str = Field(
+        description=(
+            "What is said, as it should be spoken. No name prefix, no quotation "
+            "marks, no stage directions, no emoji, no markdown."
+        )
+    )
+
+
 class VideoScript(BaseModel):
-    """A complete, ready-to-narrate cut."""
+    """A complete, ready-to-voice cut."""
 
     title: str = Field(description="Final YouTube title, under 70 characters, no clickbait lies.")
-    narration: str = Field(
+    lines: list[ScriptLine] = Field(
         description=(
-            "The full spoken script as plain prose. No headings, no speaker labels, "
-            "no stage directions, no emoji, no markdown."
+            "The whole episode as dialogue, in order. The characters carry the "
+            "story themselves; a narrator explaining them over the top is what "
+            "preschool animation specifically does not do."
         )
     )
     shots: list[Shot] = Field(description="Visual prompts covering the story arc, in order.")
     description: str = Field(description="YouTube description. Plain text, 2-4 short paragraphs.")
     tags: list[str] = Field(description="8-15 lowercase YouTube tags.")
     thumbnail_text: str = Field(description="2-4 words for the thumbnail overlay, uppercase-friendly.")
+
+    @property
+    def narration(self) -> str:
+        """Everything spoken, as one block — for captions and word counts."""
+        return " ".join(line.text.strip() for line in self.lines if line.text.strip())
+
+    @property
+    def speakers(self) -> list[str]:
+        return list(dict.fromkeys(line.speaker for line in self.lines))
 
 
 class ScriptPackage(BaseModel):
