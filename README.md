@@ -284,8 +284,16 @@ değiştirmen gerekmez.
 `https://api.ltx.video/v1`, gönderim yolu `/text-to-video`, `Bearer` token
 kimlik doğrulaması. Varsayılanlar doğru; bu değişkenleri ayarlaman gerekmiyor.
 
-LTX 2.3 **1080p'nin altını kabul etmiyor**; `longform.resolution` değerini
-düşürerek tasarruf edemezsin, bunun yerine `video.max_clips`'i düşür.
+**Çözünürlük değerinin yazımı modele özgü.** `1080p` ve `480p` gibi görünür
+adlar `ltx-2-3-fast` tarafından reddediliyor; API farklı bir enum bekliyor.
+Hangi değerlerin kabul edildiğini bulmak için:
+
+```bash
+make probe ARGS="--discover"     # ya da: python -m pipeline.cli probe --discover
+```
+
+Bu, bilinen tüm yazımları sırayla dener. **Reddedilen istek faturalanmaz** —
+üretim hiç başlamaz — yani kabul edilen ilk değere kadar hiçbir maliyeti yok.
 
 Model kimliği: `ltx-2-fast` ve `ltx-2-pro` **15 Ağustos 2026'da kapatıldı**.
 Varsayılan `ltx-2-3-fast`.

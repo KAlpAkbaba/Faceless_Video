@@ -9,7 +9,7 @@ on:
       check:
         description: "Which check to run"
         type: choice
-        options: [doctor, plan, probe]
+        options: [doctor, plan, probe, probe-discover]
         default: doctor
 
 permissions:
@@ -58,4 +58,8 @@ jobs:
           # on a non-dispatch event `inputs.*` is null, and `null == false`
           # evaluates to true in expression syntax.
           CHECK: ${{ inputs.check }}
-        run: python -m pipeline.cli "${CHECK:-doctor}"
+        run: |
+          case "${CHECK:-doctor}" in
+            probe-discover) python -m pipeline.cli probe --discover ;;
+            *)              python -m pipeline.cli "${CHECK:-doctor}" ;;
+          esac
