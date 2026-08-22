@@ -281,7 +281,17 @@ def cmd_storyboard(config: Config, args: argparse.Namespace) -> int:
         print(f"{len(script.shots)} shots\n")
         print("--- script ---")
         for line in script.lines:
-            print(f"  {line.speaker + ':':<10} {line.text}")
+            mood = f"({line.emotion})" if line.emotion and line.emotion != "neutral" else ""
+            print(f"  {line.speaker + ':':<10} {mood:<12} {line.text}")
+
+        moods = [l.emotion for l in script.lines if l.emotion]
+        if moods:
+            from collections import Counter
+            spread = Counter(moods).most_common()
+            print("\n  emotions: " + ", ".join(f"{m} x{n}" for m, n in spread))
+            if spread[0][1] > len(moods) * 0.6:
+                print(f"  WARNING: {spread[0][0]} covers most of the episode — "
+                      "a flat delivery is what makes generated speech sound generated.")
         print("\n--- shots ---")
         for index, shot in enumerate(script.shots, 1):
             print(f"{index:>3}. [{shot.beat_label}]\n     {shot.prompt}")

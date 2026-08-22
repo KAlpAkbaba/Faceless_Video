@@ -88,7 +88,7 @@ def script(title, words):
     return VideoScript(
         title=title,
         lines=[
-            ScriptLine(speaker=speakers[i % 2], text=" ".join(chunk))
+            ScriptLine(speaker=speakers[i % 2], text=" ".join(chunk), emotion="excited")
             for i, chunk in enumerate(chunks)
         ],
         shots=[Shot(beat_label=f"beat {i}", characters=["Benny"], prompt=f"prompt {i}") for i in range(3)],

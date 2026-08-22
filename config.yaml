@@ -94,47 +94,59 @@ video:
   frame_dir: "assets/frames"
   transition_seconds: 0.5      # 0 disables cross-fades and uses hard cuts
   concurrency: 3               # how many clips to generate at once
-  generate_audio: false        # we lay our own narration over the footage
+  # LTX can generate audio with each shot. It is ambient rather than dialogue —
+  # footsteps, birds, a door — and mixed low it is free sound design, since the
+  # video is billed by duration either way. Worth testing on the pilot; turn it
+  # off if it fights the voices.
+  generate_audio: false
+  generated_audio_db: -22      # how far under the dialogue it sits
   fps: 25
   # Appended to every shot prompt so the whole video looks like one piece.
   style_suffix: "cinematic documentary footage, natural lighting, shallow depth of field, muted film colour grade, slow deliberate camera movement, no text, no watermark, no readable faces in close-up"
   negative_prompt: "text, captions, watermark, logo, distorted hands, extra limbs, low quality, jitter"
 
 voice:
-  provider: "edge"             # edge (free) | elevenlabs | silent
+  # edge       -> free, and the reason the first pilot sounded robotic. It is
+  #               Microsoft's browser read-aloud service: no expression control
+  #               of any kind, so excited, worried and sad all land identically.
+  #               Shifting pitch to tell characters apart makes it worse, not
+  #               better — a neural voice bent away from its natural range
+  #               sounds synthetic. Fine for checking pacing, wrong for publishing.
+  # elevenlabs -> a real voice per character and expression that carries. About
+  #               $0.90 an episode against $15 for the same episode's video, so
+  #               roughly six per cent of the cost for most of the perceived
+  #               quality. This is the one to publish with.
+  # silent     -> no audio at all, for rehearsing the pipeline free.
+  provider: "edge"
 
-  # One voice per character. The characters speak their own lines, so a single
-  # adult narrator reading everything is exactly what this avoids.
-  #
-  # en-US-AnaNeural is Microsoft's child voice and the only genuinely young one
-  # in the free set, so the cast is built from it with pitch and rate shifting
-  # each character apart. Not ideal — real casting would use six voices — but a
-  # child voice pitched two ways reads as two children, where two adult voices
-  # read as two adults whatever you do to them.
-  #
-  # Listen before committing to these. Voices are a taste decision and the
-  # numbers below are a starting point, not an answer.
+  # Free fallback. Deliberately mild pitch shifts: large ones separate the
+  # characters at the cost of making all of them sound artificial.
   cast:
-    Benny:    { voice: "en-US-AnaNeural", rate: "+14%", pitch: "+18Hz" }
-    Lila:     { voice: "en-US-AnaNeural", rate: "+4%",  pitch: "+2Hz" }
-    Luna:     { voice: "en-US-AnaNeural", rate: "+8%",  pitch: "+10Hz" }
-    Pip:      { voice: "en-US-AnaNeural", rate: "+0%",  pitch: "+28Hz" }
-    Bobo:     { voice: "en-US-AnaNeural", rate: "-6%",  pitch: "-12Hz" }
-    Milo:     { voice: "en-US-AnaNeural", rate: "+20%", pitch: "+24Hz" }
-    Narrator: { voice: "en-US-JennyNeural", rate: "+0%", pitch: "+0Hz" }
+    Benny:    { voice: "en-US-AnaNeural",   rate: "+8%",  pitch: "+6Hz" }
+    Lila:     { voice: "en-US-AnaNeural",   rate: "+0%",  pitch: "+0Hz" }
+    Luna:     { voice: "en-US-MichelleNeural", rate: "+6%", pitch: "+8Hz" }
+    Pip:      { voice: "en-US-AnaNeural",   rate: "-4%",  pitch: "+14Hz" }
+    Bobo:     { voice: "en-US-GuyNeural",   rate: "-8%",  pitch: "-6Hz" }
+    Milo:     { voice: "en-US-AnaNeural",   rate: "+14%", pitch: "+10Hz" }
+    Narrator: { voice: "en-US-JennyNeural", rate: "+0%",  pitch: "+0Hz" }
 
-  # Used for any speaker not listed above.
+  # One ElevenLabs voice id per character, used when provider is elevenlabs.
+  # Pick them from the ElevenLabs voice library — search for child voices and
+  # audition them there before pasting the ids in. Six real voices is the whole
+  # point; do not reuse one id for several characters.
+  elevenlabs_cast: {}
+    # Benny: "voice_id_here"
+    # Lila:  "voice_id_here"
+  elevenlabs_model: "eleven_multilingual_v2"
+  elevenlabs_voice_id: ""      # fallback for a speaker with no id above
+
   default_voice: "en-US-AnaNeural"
-  default_rate: "+6%"
+  default_rate: "+4%"
   default_pitch: "+0Hz"
 
   # Silence between lines. A beat after a question is where a child answers.
   gap_seconds: 0.28
   question_gap_seconds: 0.75
-
-  elevenlabs_model: "eleven_multilingual_v2"
-  # Per-character ElevenLabs voice ids, when provider is elevenlabs.
-  elevenlabs_cast: {}
 
 captions:
   enabled_longform: false      # long-form relies on YouTube's own captions
