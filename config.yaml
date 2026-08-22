@@ -53,7 +53,7 @@ channel:
 
 longform:
   enabled: true
-  target_seconds: 360          # ~6 minutes of narration
+  target_seconds: 240          # ~4 minutes of narration
   aspect_ratio: "16:9"
   # The spelling the LTX API accepts here is model-specific and not obvious;
   # `probe --discover` reports which values it takes. Higher tiers cost
@@ -147,20 +147,37 @@ publish:
     - "history of technology"
 
 budget:
-  # Hard ceiling. The run aborts before spending anything if the estimate is over.
-  max_usd_per_run: 5.00
-  # Per-second LTX prices used for the estimate (USD, at 1080p).
+  # Hard ceiling per run. The run aborts before spending anything if the
+  # estimate exceeds it.
   #
-  # UNVERIFIED. These come from third-party listings, not from an LTX invoice,
-  # and the 2.5 figures are much higher than the 2.3 ones. Check them against
-  # your own LTX billing page and correct them here — the budget ceiling is
-  # only as honest as this table. Getting them wrong high aborts runs that
-  # would have been affordable; wrong low lets an expensive run through.
+  # At the measured $0.06/s with reuse_clips off, one episode plus its short
+  # costs roughly:
+  #     3 min  ->  $15
+  #     4 min  ->  $19
+  #     5 min  ->  $23
+  # So $25 admits any of those and still stops a runaway — a shot count that
+  # doubles by mistake, or a resolution change nobody meant to make.
+  #
+  # This is a spending decision, not a technical one. Lower it if you want a
+  # tighter leash; the run will tell you exactly what it would have cost.
+  max_usd_per_run: 25.00
+  # Per-second LTX prices, USD.
+  #
+  # ltx-2-3-fast is MEASURED, not guessed: one 8s 1920x1080 clip billed $0.48
+  # on 2026-08-22, which is $0.06/s. Every earlier figure in this file was
+  # wrong in both directions — $0.04 from a third-party listing, $0.13 from a
+  # listing for a different model generation.
+  #
+  # The others remain unverified. Read your own invoice before trusting them,
+  # and correct them here: the budget ceiling is only as honest as this table.
+  #
+  # Also confirmed by that invoice: rejected requests are not billed. The
+  # discovery sweep made dozens of them and exactly one appeared.
   ltx_price_per_second:
-    ltx-2-5-fast: 0.13
-    ltx-2-5-pro: 0.19
-    ltx-2-3-fast: 0.04
-    ltx-2-3-pro: 0.06
+    ltx-2-3-fast: 0.06      # measured 2026-08-22
+    ltx-2-3-pro: 0.09       # unverified, scaled from the fast rate
+    ltx-2-5-fast: 0.13      # unverified
+    ltx-2-5-pro: 0.19       # unverified
 
 state:
   # Rolling memory so the ideation step never repeats itself.
