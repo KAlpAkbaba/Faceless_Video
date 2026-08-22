@@ -69,3 +69,72 @@ def test_every_configured_character_is_in_the_cast_list():
     cast = config.get("voice.cast", {})
     for name in config.get("channel.cast", []):
         assert name in cast, f"{name} has no voice; it would fall back to the default"
+
+
+def test_the_sample_builds_valid_lines_for_every_character():
+    """cmd_voices --sample constructs ScriptLine by hand.
+
+    It broke the moment ScriptLine gained a required field, which no test
+    noticed because nothing exercised the construction.
+    """
+    from pipeline.cli import SAMPLE_LINES
+    from pipeline.models import ScriptLine
+
+    config = Config.load()
+    names = list(config.get("channel.cast", [])) + ["Narrator"]
+    assert names
+
+    for index, name in enumerate(names):
+        emotion, text = SAMPLE_LINES[index % len(SAMPLE_LINES)]
+        line = ScriptLine(speaker=name, text=f"Hello, I am {name}. {text}", emotion=emotion)
+        assert line.emotion and line.text
+
+
+def test_the_sample_covers_several_emotions():
+    """One flat sentence repeated cannot show whether emotion carries."""
+    from pipeline.cli import SAMPLE_LINES
+
+    emotions = [emotion for emotion, _ in SAMPLE_LINES]
+    assert len(set(emotions)) == len(emotions)
+    assert len(emotions) >= 5
+
+
+def test_the_sample_command_runs_end_to_end(tmp_path, monkeypatch):
+    """Exercise cmd_voices itself, not just the pieces it is made of.
+
+    Two bugs shipped because nothing called this function: a ScriptLine built
+    without a field the model had gained, and a destination that a later edit
+    removed. Both are the kind that only a real invocation finds.
+    """
+    import argparse
+
+    import pipeline.cli as cli
+    from pipeline.config import Config
+
+    config = Config.load()
+    config.data["voice"]["provider"] = "silent"
+    monkeypatch.setattr(cli, "REPO_ROOT", tmp_path)
+
+    code = cli.cmd_voices(
+        config, argparse.Namespace(source=None, cut="longform", sample=True)
+    )
+
+    assert code == 0
+    written = tmp_path / "out" / "voices" / "cast-sample.mp3"
+    assert written.exists() and written.stat().st_size > 1000
+
+
+def test_voices_without_a_storyboard_explains_itself(tmp_path, monkeypatch):
+    import argparse
+
+    import pipeline.cli as cli
+    from pipeline.config import Config
+
+    config = Config.load()
+    config.data["voice"]["provider"] = "silent"
+    monkeypatch.setattr(cli, "REPO_ROOT", tmp_path)
+
+    code = cli.cmd_voices(
+        config, argparse.Namespace(source=None, cut="longform", sample=False)
+    )
+    assert code == 2
