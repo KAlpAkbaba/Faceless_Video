@@ -122,8 +122,18 @@ def cmd_doctor(config: Config) -> int:
         ok = ok and (bool(value) or not required)
 
     print()
-    print("OK" if ok else "Problems found — see MISSING entries above.")
-    return 0 if ok else 1
+    if ok:
+        print("OK")
+        return 0
+
+    print("Problems found — see MISSING entries above.")
+    print(
+        "\nLocally, put the missing values in a .env file at the repository root "
+        "(copy .env.example)\nand they are picked up automatically. In GitHub Actions "
+        "they come from repository secrets.\nReal environment variables always win over "
+        ".env, so the two never fight."
+    )
+    return 1
 
 
 def cmd_plan(config: Config) -> int:
