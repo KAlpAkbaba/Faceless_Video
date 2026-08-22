@@ -34,6 +34,9 @@ class RunOptions:
     upload: bool = True
     work_dir: Path | None = None
     output_dir: Path | None = None
+    # Cap generation for a pilot: enough footage to judge whether the cast
+    # holds together, without paying for a whole episode to find out.
+    max_shots: int | None = None
 
 
 def trim_shots(
@@ -44,6 +47,7 @@ def trim_shots(
     clip_seconds: float,
     transition: float,
     label: str,
+    cap: int | None = None,
 ) -> list:
     """Generate only as many shots as the finished cut can actually show.
 
@@ -55,6 +59,14 @@ def trim_shots(
     With clips looped this does not arise — the count is a quality dial, not a
     length — so the planned number stands.
     """
+    if cap is not None:
+        if cap < len(shots):
+            log.warning(
+                "%s: capped at %d of %d shots — this is a pilot, not a finished cut.",
+                label, cap, len(shots),
+            )
+        return shots[:cap]
+
     if reuse:
         return shots[:planned]
 
@@ -188,7 +200,7 @@ def run(config: Config, options: RunOptions | None = None) -> RunReport:
 
             voiceover = synthesize(config, package.longform.narration, work_dir / "longform" / "narration.mp3")
             shots = trim_shots(package.longform.shots, voiceover.duration, reuse, longform_clips,
-                               clip_seconds, transition, "long-form")
+                               clip_seconds, transition, "long-form", options.max_shots)
             longform_clip_assets = generate_clips(
                 config,
                 provider,
@@ -231,7 +243,7 @@ def run(config: Config, options: RunOptions | None = None) -> RunReport:
                     config,
                     provider,
                     trim_shots(package.shorts.shots, voiceover.duration, reuse, shorts_clips,
-                               clip_seconds, transition, "shorts"),
+                               clip_seconds, transition, "shorts", options.max_shots),
                     work_dir=work_dir / "clips_shorts",
                     aspect_ratio=aspect,
                     resolution=resolution,

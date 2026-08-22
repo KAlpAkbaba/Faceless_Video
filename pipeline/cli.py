@@ -78,6 +78,13 @@ def build_parser() -> argparse.ArgumentParser:
     run_cmd = sub.add_parser("run", help="Run the full pipeline.")
     run_cmd.add_argument("--only", choices=["both", "longform", "shorts"], default="both")
     run_cmd.add_argument("--no-upload", action="store_true", help="Render locally, do not publish.")
+    run_cmd.add_argument(
+        "--max-shots",
+        type=int,
+        default=None,
+        help="Generate at most this many shots per cut. Use it to test character "
+             "consistency on a minute of footage before paying for five.",
+    )
     run_cmd.add_argument("--work-dir", default=None)
     run_cmd.add_argument("--output-dir", default=None)
     return parser
@@ -293,6 +300,7 @@ def cmd_run(config: Config, args: argparse.Namespace) -> int:
         upload=not args.no_upload,
         work_dir=Path(args.work_dir) if args.work_dir else None,
         output_dir=Path(args.output_dir) if args.output_dir else None,
+        max_shots=args.max_shots,
     )
     report = run(config, options)
     print("\n" + report.summary())

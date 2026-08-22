@@ -27,6 +27,20 @@ shot, preferring a frame that names all of them, then one that names the lead,
 then anything. It rotates through the matches so consecutive shots do not all
 start from the same picture.
 
+## Shot one is not just another frame
+
+The first shot is what the viewer sees first and where the thumbnail comes
+from, so its frame carries two rules the others do not:
+
+- **It shows the problem.** If the episode opens on "where did all the colours
+  go?", the frame is a world with no colour in it.
+- **It does not show the solution.** If the story is about finding three colour
+  boxes at the top of a hill, the boxes are not in the opening frame. A first
+  frame that gives away the discovery throws away the reason to keep watching.
+
+Read shot one of the storyboard and build the frame to match it, not the other
+way round. It is much cheaper to make a picture than to rewrite an episode.
+
 More frames means more variety. A dozen covering the usual places is a
 reasonable start; add a new one whenever an episode needs a place you do not
 have yet.
