@@ -95,8 +95,16 @@ publish:
 budget:
   # Hard ceiling. The run aborts before spending anything if the estimate is over.
   max_usd_per_run: 5.00
-  # Per-second LTX prices used for the estimate (USD, 1080p).
+  # Per-second LTX prices used for the estimate (USD, at 1080p).
+  #
+  # UNVERIFIED. These come from third-party listings, not from an LTX invoice,
+  # and the 2.5 figures are much higher than the 2.3 ones. Check them against
+  # your own LTX billing page and correct them here — the budget ceiling is
+  # only as honest as this table. Getting them wrong high aborts runs that
+  # would have been affordable; wrong low lets an expensive run through.
   ltx_price_per_second:
+    ltx-2-5-fast: 0.13
+    ltx-2-5-pro: 0.19
     ltx-2-3-fast: 0.04
     ltx-2-3-pro: 0.06
 

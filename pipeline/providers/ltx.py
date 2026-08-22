@@ -35,9 +35,25 @@ STATUS_PATHS = ("/generations/{id}", "/text-to-video/{id}", "/jobs/{id}", "/requ
 # A rejected request is never generated and never billed, so sweeping the
 # combinations costs nothing until one is accepted.
 #
-# The API reports these as the legal values of the field, but a given model
-# accepts only a subset of them — ltx-2-3-fast rejects both 480p and 1080p —
-# and the subset is not documented anywhere reachable.
+# Nothing here is guessed from documentation: the sweep asks the API which
+# values it takes. Two error shapes distinguish the cases — "Invalid model X"
+# means the id is unknown, while "Resolution X is not supported by model Y"
+# means the id is known but that resolution is not on offer for it. A model
+# that supports none of them is retired.
+MODEL_CANDIDATES: tuple[str, ...] = (
+    "ltx-2-5-fast",
+    "ltx-2-5-pro",
+    "ltx-2-5-lite",
+    "ltx-2-5",
+    "ltx-2-3-fast",
+    "ltx-2-3-pro",
+    "ltx-2-fast",
+    "ltx-2-pro",
+)
+
+# The first six are the labels this module maps to pixels; the rest are other
+# spellings the API might expect, since `resolution` is a required field whose
+# accepted vocabulary is not published anywhere reachable from here.
 RESOLUTION_CANDIDATES: tuple[str | None, ...] = (
     "1080p",
     "720p",
@@ -45,17 +61,16 @@ RESOLUTION_CANDIDATES: tuple[str | None, ...] = (
     "2160p",
     "4k",
     "480p",
-    None,  # omit the field; width/height are sent regardless
+    "1080",
+    "720",
+    "1920x1080",
+    "1280x720",
+    "FHD",
+    "HD",
 )
 
-# If no resolution works, the model id itself is the likelier culprit: LTX has
-# published ids in more than one style.
-MODEL_CANDIDATES: tuple[str, ...] = (
-    "ltxv-2.3-fast",
-    "ltx-2.3-fast",
-    "ltx-2-3-pro",
-    "ltxv-2.3-pro",
-)
+# Tried in order; the first that answers is reported verbatim.
+MODEL_LIST_PATHS = ("/models", "/model", "/text-to-video/models")
 
 RESOLUTION_PIXELS = {
     "480p": (854, 480),
@@ -210,10 +225,26 @@ class LTXProvider:
         response = self.client.post(f"{self.base_url}{path}", json=payload)
         return response.status_code, response.text[:400]
 
+    def list_models(self) -> dict[str, Any]:
+        """Ask the API which models exist, if it will say."""
+        for path in MODEL_LIST_PATHS:
+            try:
+                response = self.client.get(f"{self.base_url}{path}")
+            except httpx.HTTPError as exc:
+                continue
+            if response.status_code == 404:
+                continue
+            return {"path": path, "status": response.status_code, "body": response.text[:2000]}
+        return {"error": f"no listing endpoint answered under {self.base_url}"}
+
     def discover(self, prompt: str, *, seconds: float) -> dict[str, Any]:
-        """Sweep model and resolution combinations until one is accepted."""
+        """Ask the API what it accepts, rather than guessing from docs."""
+        catalogue = self.list_models()
+        log.info("model listing: %s", str(catalogue)[:300])
+
         attempts: list[dict[str, Any]] = []
         accepted: dict[str, Any] | None = None
+        known_models: list[str] = []
 
         # The configured model first; the alternates only if it never works.
         models = [self.model] + [m for m in MODEL_CANDIDATES if m != self.model]
@@ -234,10 +265,7 @@ class LTXProvider:
                 )
                 payload = self.build_payload(request)
                 payload["model"] = model
-                if candidate is None:
-                    payload.pop("resolution", None)
-                else:
-                    payload["resolution"] = candidate
+                payload["resolution"] = candidate
 
                 try:
                     status, body = self.try_submit(payload)
@@ -248,23 +276,37 @@ class LTXProvider:
                 attempts.append(
                     {"model": model, "resolution": candidate, "status": status, "body": body}
                 )
-                log.info("model=%-16s resolution=%-8s -> HTTP %s", model, candidate, status)
+                log.info("model=%-14s resolution=%-10s -> HTTP %s", model, candidate, status)
 
                 if status < 400:
-                    # Accepted, and therefore the only billed attempt.
                     accepted = {"model": model, "resolution": candidate, "response": body}
                     log.info("ACCEPTED: model=%s resolution=%s", model, candidate)
                     break
+
+                if "Invalid model" in body or "invalid model" in body:
+                    # The id itself is unknown, so the other resolutions would
+                    # fail for the same reason. Move on.
+                    log.info("model=%-14s is not a known model id, skipping", model)
+                    break
+
+                # Reaching a resolution complaint means the id is real.
+                if model not in known_models:
+                    known_models.append(model)
             if accepted:
                 break
 
         if not accepted:
-            log.error("No model/resolution combination was accepted. See attempts below.")
+            log.error(
+                "Nothing accepted. Model ids the API recognises: %s",
+                ", ".join(known_models) or "none",
+            )
 
         return {
             "base_url": self.base_url,
             "submit_path": self._submit_path or SUBMIT_PATHS[0],
             "configured_model": self.model,
+            "model_listing": catalogue,
+            "recognised_models": known_models,
             "accepted": accepted,
             "attempts": attempts,
         }
