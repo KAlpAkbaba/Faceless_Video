@@ -32,26 +32,29 @@ log = logging.getLogger(__name__)
 SUBMIT_PATHS = ("/text-to-video", "/generations/text-to-video", "/video/generations", "/generations")
 STATUS_PATHS = ("/generations/{id}", "/text-to-video/{id}", "/jobs/{id}", "/requests/{id}")
 
-# Values to try when the configured resolution is rejected. A rejected request
-# is never generated and never billed, so the whole list costs nothing until
-# one is accepted — which makes brute force the cheapest way to learn an enum
-# whose documentation is unreachable.
+# A rejected request is never generated and never billed, so sweeping the
+# combinations costs nothing until one is accepted.
+#
+# The API reports these as the legal values of the field, but a given model
+# accepts only a subset of them — ltx-2-3-fast rejects both 480p and 1080p —
+# and the subset is not documented anywhere reachable.
 RESOLUTION_CANDIDATES: tuple[str | None, ...] = (
-    None,  # omit the field; width/height alone may be enough
-    "RESOLUTION_1080",
-    "RESOLUTION_720",
-    "RESOLUTION_480",
-    "1080",
-    "720",
-    "1920x1080",
-    "1280x720",
-    "FHD",
-    "HD",
-    "full_hd",
-    "hd",
-    "fhd",
-    "4K",
-    "2160",
+    "1080p",
+    "720p",
+    "1440p",
+    "2160p",
+    "4k",
+    "480p",
+    None,  # omit the field; width/height are sent regardless
+)
+
+# If no resolution works, the model id itself is the likelier culprit: LTX has
+# published ids in more than one style.
+MODEL_CANDIDATES: tuple[str, ...] = (
+    "ltxv-2.3-fast",
+    "ltx-2.3-fast",
+    "ltx-2-3-pro",
+    "ltxv-2.3-pro",
 )
 
 RESOLUTION_PIXELS = {
@@ -208,43 +211,60 @@ class LTXProvider:
         return response.status_code, response.text[:400]
 
     def discover(self, prompt: str, *, seconds: float) -> dict[str, Any]:
-        """Find a resolution value the model accepts, reporting every attempt."""
+        """Sweep model and resolution combinations until one is accepted."""
         attempts: list[dict[str, Any]] = []
         accepted: dict[str, Any] | None = None
 
-        for candidate in RESOLUTION_CANDIDATES:
-            request = ClipRequest(
-                prompt=prompt,
-                seconds=seconds,
-                aspect_ratio="16:9",
-                resolution=candidate or "1080p",  # only feeds the pixel maths
-                negative_prompt="",
-                seed=None,
-            )
-            payload = self.build_payload(request)
-            if candidate is None:
-                payload.pop("resolution", None)
-            else:
-                payload["resolution"] = candidate
+        # The configured model first; the alternates only if it never works.
+        models = [self.model] + [m for m in MODEL_CANDIDATES if m != self.model]
 
-            try:
-                status, body = self.try_submit(payload)
-            except httpx.HTTPError as exc:
-                attempts.append({"resolution": candidate, "error": str(exc)})
-                continue
+        for model in models:
+            for candidate in RESOLUTION_CANDIDATES:
+                # The pixel maths needs a label it knows; the candidate only
+                # ever reaches the payload. Conflating the two is what broke
+                # the first version of this sweep.
+                label = candidate if candidate in RESOLUTION_PIXELS else "1080p"
+                request = ClipRequest(
+                    prompt=prompt,
+                    seconds=seconds,
+                    aspect_ratio="16:9",
+                    resolution=label,
+                    negative_prompt="",
+                    seed=None,
+                )
+                payload = self.build_payload(request)
+                payload["model"] = model
+                if candidate is None:
+                    payload.pop("resolution", None)
+                else:
+                    payload["resolution"] = candidate
 
-            attempts.append({"resolution": candidate, "status": status, "body": body})
-            log.info("resolution=%-16s -> HTTP %s", candidate, status)
+                try:
+                    status, body = self.try_submit(payload)
+                except httpx.HTTPError as exc:
+                    attempts.append({"model": model, "resolution": candidate, "error": str(exc)})
+                    continue
 
-            if status < 400:
-                # This one was accepted, so it is also the only billed attempt.
-                accepted = {"resolution": candidate, "response": body}
+                attempts.append(
+                    {"model": model, "resolution": candidate, "status": status, "body": body}
+                )
+                log.info("model=%-16s resolution=%-8s -> HTTP %s", model, candidate, status)
+
+                if status < 400:
+                    # Accepted, and therefore the only billed attempt.
+                    accepted = {"model": model, "resolution": candidate, "response": body}
+                    log.info("ACCEPTED: model=%s resolution=%s", model, candidate)
+                    break
+            if accepted:
                 break
+
+        if not accepted:
+            log.error("No model/resolution combination was accepted. See attempts below.")
 
         return {
             "base_url": self.base_url,
             "submit_path": self._submit_path or SUBMIT_PATHS[0],
-            "model": self.model,
+            "configured_model": self.model,
             "accepted": accepted,
             "attempts": attempts,
         }
