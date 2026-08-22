@@ -10,20 +10,37 @@ CHANNEL
 TODAY'S EPISODE
 - Working title: {{WORKING_TITLE}}
 - The one thing it teaches: {{ANGLE}}
-- What the child can do by the end: {{HOOK_PROMISE}}
+- Characters in this episode: {{CAST_IN_EPISODE}}
+- The opening line, or something very close to it: {{HOOK}}
+- The thumbnail moment this episode must contain: {{THUMBNAIL}}
 - Story beats in order: {{KEY_FACTS}}
 - Care needed: {{FACT_RISK}}
 
 DELIVER TWO CUTS
 
 A) MAIN EPISODE — about {{LONGFORM_WORDS}} words (within 8% of that).
-   Structure: greet, meet the little problem, try, solve it together, say the
-   lesson once more, wave goodbye.
    Include exactly {{LONGFORM_SHOTS}} shots.
+
+   THE FIRST TEN SECONDS DECIDE EVERYTHING. A child leaves before a greeting
+   finishes. So:
+     0-2s   the problem happens, on screen, first thing. No hello, no logo,
+            no "welcome back". The very first sentence is the hook above.
+     2-5s   a character reacts to it, out loud.
+     5-8s   ask the child for help: "Can you help us?"
+     8-10s  the adventure starts.
+   Greetings, if any, come after that — never before.
+
+   Then: try something, try again, solve it together, say the lesson once
+   more, wave goodbye.
+
+   The thumbnail moment listed above must actually happen in the episode, and
+   should land in the first minute. A thumbnail promising something the video
+   does not show is the fastest way to lose a viewer and the algorithm.
 
 B) SHORT VERSION — about {{SHORTS_WORDS}} words. A standalone moment from the
    same world, complete on its own. Never say "watch the full video".
-   Include exactly {{SHORTS_SHOTS}} shots.
+   Include exactly {{SHORTS_SHOTS}} shots. The same rule applies, harder: the
+   problem is in the first sentence or there is no viewer.
 
 HOW TO WRITE FOR A THREE-YEAR-OLD
 - Short sentences. One idea per sentence. Six to nine words is plenty.
@@ -56,8 +73,9 @@ already establishes exactly how they look, so:
 - The shots in order should read as the story, one beat each.
 
 METADATA RULES
-- Title: plain and searchable, under 70 characters. Say what happens and who is
-  in it. No ALL CAPS, no clickbait, no emoji spam.
+- Title: use the working title above unless it is clearly wrong. The plan pairs
+  a story with a search term deliberately; do not quietly retitle around it.
+  Under 70 characters, no ALL CAPS, no clickbait, no emoji spam.
 - Description: 2-3 short plain paragraphs a parent would read. Say what the
   episode teaches. No links.
 - Tags: 8-15 lowercase phrases a parent would actually type.

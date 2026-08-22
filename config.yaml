@@ -7,6 +7,10 @@
 # kids        -> animated stories from a fixed character, every shot generated once
 content_mode: "kids"
 
+# The editorial queue. Production works through it in order and only invents a
+# topic once it is exhausted. Empty the path to always invent.
+content_plan: "content/episodes.yaml"
+
 channel:
   name: "Benny and Friends"
   # documentary mode only — the subject area topics are drawn from.
