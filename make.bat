@@ -25,6 +25,8 @@ if /I "%TARGET%"=="plan"   goto plan
 if /I "%TARGET%"=="probe"  goto probe
 if /I "%TARGET%"=="auth"   goto auth
 if /I "%TARGET%"=="storyboard" goto storyboard
+if /I "%TARGET%"=="voices" goto voices
+if /I "%TARGET%"=="sample" goto sample
 if /I "%TARGET%"=="dry"    goto dry
 if /I "%TARGET%"=="run"    goto runall
 echo Unknown target: %TARGET%
@@ -139,6 +141,14 @@ exit /b %errorlevel%
 "%PY%" -m pipeline.cli storyboard
 exit /b %errorlevel%
 
+:voices
+"%PY%" -m pipeline.cli voices
+exit /b %errorlevel%
+
+:sample
+"%PY%" -m pipeline.cli voices --sample
+exit /b %errorlevel%
+
 :dry
 "%PY%" -m pipeline.cli run --no-upload
 exit /b %errorlevel%
@@ -163,6 +173,8 @@ echo   make plan      print the cost estimate, spend nothing
 echo   make probe     send one cheap LTX job and dump the raw response
 echo   make auth      mint YouTube OAuth credentials (needs a browser)
 echo   make storyboard plan one episode and cost it, generating no video
+echo   make voices     voice the last storyboard so you can hear it
+echo   make sample     have each character say one line, to audition the cast
 echo   make dry       full render, nothing published
 echo   make run       full pipeline and publish
 echo   make test      run the test suite

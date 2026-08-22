@@ -1,4 +1,4 @@
-.PHONY: install test doctor plan probe auth storyboard dry run clean
+.PHONY: install test doctor plan probe auth storyboard voices sample dry run clean
 
 install:
 	python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" || \
@@ -23,6 +23,12 @@ auth:
 
 storyboard:
 	.venv/bin/python -m pipeline.cli storyboard
+
+voices:
+	.venv/bin/python -m pipeline.cli voices
+
+sample:
+	.venv/bin/python -m pipeline.cli voices --sample
 
 # Full render, nothing published, nothing spent on video or voice.
 dry:
