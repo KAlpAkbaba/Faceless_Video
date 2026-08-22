@@ -14,6 +14,12 @@ from .references import ReferenceLibrary
 log = logging.getLogger(__name__)
 
 
+def _identical_failures(failures: list[str]) -> int:
+    """How many of the failures so far carry the same message."""
+    messages = [f.split(": ", 1)[-1] for f in failures]
+    return max((messages.count(m) for m in set(messages)), default=0)
+
+
 def build_clip_prompt(shot: Shot, style_suffix: str) -> str:
     """Append the channel's house style so every clip looks like the same film."""
     prompt = shot.prompt.strip().rstrip(".")
@@ -73,6 +79,7 @@ def generate_clips(
 
     assets: list[ClipAsset] = []
     failures: list[str] = []
+    repeated: str | None = None
 
     with ThreadPoolExecutor(max_workers=max(1, concurrency)) as pool:
         futures = {pool.submit(render, i, shot): (i, shot) for i, shot in enumerate(shots)}
@@ -81,10 +88,31 @@ def generate_clips(
             try:
                 assets.append(future.result())
             except (VideoGenerationError, OSError) as exc:
-                failures.append(f"shot {index} ({shot.beat_label}): {exc}")
-                log.error("Clip %d failed: %s", index, exc)
+                message = str(exc)
+                failures.append(f"shot {index} ({shot.beat_label}): {message}")
+
+                # The same rejection on every shot is one configuration problem,
+                # not thirty independent ones. Say it once and stop, instead of
+                # scrolling the same 400 past the reader thirty times.
+                if repeated is None and _identical_failures(failures) >= 3:
+                    repeated = message
+                    log.error(
+                        "Every shot is failing the same way, so this is a configuration "
+                        "problem rather than a run of bad luck:\n  %s\nAbandoning the "
+                        "remaining shots.",
+                        message,
+                    )
+                    for pending in futures:
+                        pending.cancel()
+                elif repeated is None:
+                    log.error("Clip %d failed: %s", index, exc)
 
     assets.sort(key=lambda asset: asset.index)
+    if repeated:
+        raise VideoGenerationError(
+            f"Every shot was rejected the same way, so nothing was generated and "
+            f"nothing was billed:\n  {repeated}"
+        )
     if failures:
         log.warning("%d of %d clips failed:\n  %s", len(failures), len(shots), "\n  ".join(failures))
     if not assets:
