@@ -107,8 +107,22 @@ class Config:
 
     def validate(self) -> None:
         """Fail fast on config that would only blow up halfway through a render."""
-        for key in ("channel.niche", "video.provider", "video.model", "publish.publish_at_local"):
+        for key in ("video.provider", "video.model", "publish.publish_at_local"):
             self.require(key)
+
+        mode = self.get("content_mode", "documentary")
+        if mode not in ("documentary", "kids"):
+            raise ConfigError(f"content_mode must be 'documentary' or 'kids', got {mode!r}")
+        if mode == "documentary" and not self.get("channel.niche"):
+            raise ConfigError("channel.niche is required in documentary mode.")
+        if mode == "kids" and not self.get("channel.characters"):
+            raise ConfigError(
+                "channel.characters is required in kids mode — the shot prompts rely on a "
+                "fixed cast rather than describing anyone."
+            )
+
+        if self.get("video.generation", "text") not in ("text", "image"):
+            raise ConfigError("video.generation must be 'text' or 'image'.")
 
         if not (self.get("longform.enabled") or self.get("shorts.enabled")):
             raise ConfigError("Both longform.enabled and shorts.enabled are false — nothing to make.")

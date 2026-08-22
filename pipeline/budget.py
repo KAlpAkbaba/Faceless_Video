@@ -38,6 +38,17 @@ class CostEstimate:
         return "\n".join(rows)
 
 
+def shots_for_duration(seconds: float, clip_seconds: float, transition_seconds: float = 0.0) -> int:
+    """How many generated shots a runtime needs when nothing is reused.
+
+    Reusing character references and backgrounds does not reduce this: what is
+    reused is the design, not the motion. Every second on screen is still a
+    second of generated video.
+    """
+    effective = max(0.1, clip_seconds - transition_seconds)
+    return max(1, int(-(-(seconds - transition_seconds) // effective)))
+
+
 def estimate_run_cost(
     *,
     longform_clips: int,

@@ -17,6 +17,15 @@ log = logging.getLogger(__name__)
 MODEL = "claude-opus-5"
 PROMPT_DIR = REPO_ROOT / "prompts"
 
+# Each content mode has its own pair of templates. Kids writing is not
+# documentary writing with simpler words — different structure, different
+# safety rules, and shot prompts that must never describe the characters,
+# because a fixed reference picture already does.
+PROMPT_SETS = {
+    "documentary": ("ideation.md", "script.md"),
+    "kids": ("ideation_kids.md", "script_kids.md"),
+}
+
 # Spoken words per second for a documentary-paced TTS voice. Used to turn a
 # target runtime in seconds into a word count for the writer.
 WORDS_PER_SECOND = 2.5
@@ -29,6 +38,9 @@ def _load_prompt(name: str, **fields: str) -> str:
     text = path.read_text(encoding="utf-8")
     for key, value in fields.items():
         text = text.replace("{{" + key + "}}", value)
+    # Unfilled placeholders are a real bug — a prompt silently missing the
+    # channel's niche produces confident nonsense. Extra fields the template
+    # does not use are fine; templates differ between content modes.
     leftover = re.findall(r"\{\{([A-Z_]+)\}\}", text)
     if leftover:
         raise ConfigError(f"Prompt {name} has unfilled placeholders: {sorted(set(leftover))}")
@@ -52,6 +64,11 @@ class Writer:
 
     def __init__(self, config: Config, client: anthropic.Anthropic | None = None):
         self.config = config
+        mode = str(config.get("content_mode", "documentary"))
+        if mode not in PROMPT_SETS:
+            raise ConfigError(f"content_mode must be one of {sorted(PROMPT_SETS)}, got {mode!r}")
+        self.ideation_template, self.script_template = PROMPT_SETS[mode]
+        log.info("Content mode: %s", mode)
         if client is not None:
             self.client = client
         else:
@@ -68,9 +85,10 @@ class Writer:
         banned = ", ".join(self.config.get("channel.banned_topics", [])) or "(none)"
 
         system = _load_prompt(
-            "ideation.md",
+            self.ideation_template,
             CHANNEL_NAME=str(self.config.get("channel.name", "the channel")),
-            NICHE=str(self.config.require("channel.niche")),
+            NICHE=str(self.config.get("channel.niche", "")),
+            CHARACTERS=str(self.config.get("channel.characters", "(none defined)")),
             AUDIENCE=str(self.config.get("channel.audience", "a general audience")),
             TONE=str(self.config.get("channel.tone", "neutral and factual")),
             BANNED=banned,
@@ -108,6 +126,22 @@ class Writer:
             "Widen channel.niche or trim state/history.json."
         )
 
+    def shot_count(self, seconds: float, reuse_key: str, default: int) -> int:
+        """How many shots to ask for.
+
+        With reuse on, the count is a quality dial set in config. With it off,
+        the runtime decides: every shot plays once, so they must add up.
+        """
+        from .budget import shots_for_duration
+
+        if self.config.get("video.reuse_clips", True):
+            return int(self.config.get(reuse_key, default))
+        return shots_for_duration(
+            seconds,
+            float(self.config.get("video.clip_seconds", 8)),
+            float(self.config.get("video.transition_seconds", 0.5)),
+        )
+
     # -- step 2: write both cuts ------------------------------------------
 
     def write_scripts(self, idea: TopicIdea) -> ScriptPackage:
@@ -115,9 +149,10 @@ class Writer:
         shorts_seconds = float(self.config.get("shorts.target_seconds", 50))
 
         system = _load_prompt(
-            "script.md",
+            self.script_template,
             CHANNEL_NAME=str(self.config.get("channel.name", "the channel")),
-            NICHE=str(self.config.require("channel.niche")),
+            NICHE=str(self.config.get("channel.niche", "")),
+            CHARACTERS=str(self.config.get("channel.characters", "(none defined)")),
             AUDIENCE=str(self.config.get("channel.audience", "a general audience")),
             TONE=str(self.config.get("channel.tone", "neutral and factual")),
             WORKING_TITLE=idea.working_title,
@@ -127,8 +162,8 @@ class Writer:
             FACT_RISK=idea.fact_risk or "none",
             LONGFORM_WORDS=str(target_words(longform_seconds)),
             SHORTS_WORDS=str(target_words(shorts_seconds)),
-            LONGFORM_SHOTS=str(int(self.config.get("video.max_clips", 12))),
-            SHORTS_SHOTS=str(int(self.config.get("shorts.max_clips", 6))),
+            LONGFORM_SHOTS=str(self.shot_count(longform_seconds, "video.max_clips", 12)),
+            SHORTS_SHOTS=str(self.shot_count(shorts_seconds, "shorts.max_clips", 6)),
         )
 
         response = self.client.messages.parse(

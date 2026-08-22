@@ -36,6 +36,18 @@ class Segment:
     source_offset: float
 
 
+def clips_needed(total_duration: float, clip_seconds: float, transition_seconds: float) -> int:
+    """How many clips it takes to cover the runtime with no reuse.
+
+    Every shot plays once, so the clips must actually add up to the duration.
+    This is what makes story animation cost what it costs.
+    """
+    if clip_seconds <= transition_seconds:
+        raise ValueError("video.clip_seconds must exceed video.transition_seconds.")
+    effective = clip_seconds - transition_seconds
+    return max(1, int(-(-(total_duration - transition_seconds) // effective)))
+
+
 def plan_segments(
     total_duration: float,
     clip_count: int,
@@ -43,6 +55,7 @@ def plan_segments(
     segment_seconds: float,
     transition_seconds: float,
     clip_seconds: float,
+    reuse: bool = True,
 ) -> list[Segment]:
     """Work out which clip fills which slice of the timeline.
 
@@ -53,6 +66,15 @@ def plan_segments(
         raise ValueError("Cannot plan a timeline with no clips.")
     if total_duration <= 0:
         raise ValueError("Cannot plan a timeline with no duration.")
+
+    if not reuse:
+        # Story animation: each clip is a distinct beat and plays exactly once,
+        # for its own length. Looping one would walk the character backwards.
+        transition = max(0.0, min(float(transition_seconds), clip_seconds / 3))
+        return [
+            Segment(index=i, clip_index=i, duration=float(clip_seconds), source_offset=0.0)
+            for i in range(clip_count)
+        ]
 
     length = max(2.0, float(segment_seconds))
     transition = max(0.0, min(float(transition_seconds), length / 3))
@@ -121,12 +143,14 @@ def render_segment(
     duration: float,
     offset: float,
     fps: int,
+    loop: bool = True,
 ) -> Path:
     """Cut one timeline slot, scaled and cropped to fill the frame."""
     run_ffmpeg(
         [
-            # Loop the boomerang indefinitely; -t decides how much we keep.
-            "-stream_loop", "-1",
+            # Looping only makes sense for a boomerang source; a story shot is
+            # played once, for exactly as long as it lasts.
+            *(["-stream_loop", "-1"] if loop else []),
             "-ss", f"{offset:.3f}",
             "-i", str(source),
             "-t", f"{duration:.3f}",
@@ -297,6 +321,7 @@ def assemble(config: Config, request: RenderRequest, work_dir: Path) -> RenderRe
     stage = work_dir / request.kind
     stage.mkdir(parents=True, exist_ok=True)
 
+    reuse = bool(config.get("video.reuse_clips", True))
     target = request.voiceover.duration + TAIL_SECONDS
     segments = plan_segments(
         target,
@@ -304,16 +329,21 @@ def assemble(config: Config, request: RenderRequest, work_dir: Path) -> RenderRe
         segment_seconds=segment_seconds,
         transition_seconds=transition,
         clip_seconds=clip_seconds,
+        reuse=reuse,
     )
     log.info(
         "%s timeline: %.1fs of narration -> %d segments from %d clips",
         request.kind, request.voiceover.duration, len(segments), len(request.clips),
     )
 
-    boomerangs = {
-        clip.index: build_boomerang(clip, stage / f"loop_{clip.index:02d}.mp4", fps)
-        for clip in request.clips
-    }
+    if reuse:
+        sources = {
+            clip.index: build_boomerang(clip, stage / f"loop_{clip.index:02d}.mp4", fps)
+            for clip in request.clips
+        }
+    else:
+        # No looping, so the clip is its own source and needs no preparation.
+        sources = {clip.index: clip.path for clip in request.clips}
     ordered_clips = sorted(request.clips, key=lambda c: c.index)
 
     segment_paths: list[Path] = []
@@ -321,13 +351,14 @@ def assemble(config: Config, request: RenderRequest, work_dir: Path) -> RenderRe
         clip = ordered_clips[segment.clip_index % len(ordered_clips)]
         segment_paths.append(
             render_segment(
-                boomerangs[clip.index],
+                sources[clip.index],
                 stage / f"seg_{segment.index:03d}.mp4",
                 width=request.width,
                 height=request.height,
                 duration=segment.duration,
                 offset=segment.source_offset,
                 fps=fps,
+                loop=reuse,
             )
         )
 

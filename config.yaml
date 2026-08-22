@@ -3,19 +3,45 @@
 # Secrets never live here; they come from environment variables / GitHub Secrets.
 # ---------------------------------------------------------------------------
 
+# documentary -> narration over atmospheric B-roll, clips looped to keep cost down
+# kids        -> animated stories from a fixed character, every shot generated once
+content_mode: "kids"
+
 channel:
-  name: "Quiet Frontiers"
-  # The niche drives every topic the ideation step invents. Make it narrow.
-  niche: "little-known engineering and science stories that changed the modern world"
+  name: "Benny and Friends"
+  # documentary mode only — the subject area topics are drawn from.
+  niche: ""
+  # kids mode: the fixed cast.
+  #
+  # Shot prompts must NEVER describe how these characters look — the reference
+  # images in assets/characters fix that, and a prompt that re-describes them
+  # fights the reference and produces drift. This text exists so the writer
+  # knows who they ARE: personality, relationships, what each one is for in a
+  # story. Appearance lives in the pictures, character lives here.
+  characters: >-
+    Benny is an energetic boy who notices things first and says so loudly. He
+    leads, sometimes before thinking.
+    Lila is thoughtful and asks the question everyone else missed. She works
+    problems out slowly and is usually right.
+    Milo is a golden puppy: playful, clumsy, no words. He causes the small
+    accident that starts a story, and is forgiven immediately.
+    Pip is a friendly little robot who loves learning. Numbers, counting and
+    naming things are his. He is delighted by facts.
+    Luna is musical and expressive. Rhythm, singing, dancing and drawing belong
+    to her, and she cheers everyone else on.
+    Bobo is a small purple monster, mischievous and warm. He hides things and
+    makes silly mistakes, never mean ones.
+    They are friends of the same age. Nobody is the butt of a joke, nobody is
+    excluded, and every problem is solved together.
   language: "en-US"
-  audience: "curious English-speaking adults, 25-45, who watch explainer content"
-  tone: "calm, documentary, factual, no hype, no clickbait lies"
-  # Topics the ideation step must never pick.
+  audience: "children aged two to six, and the parents watching with them"
+  tone: "warm, calm, encouraging, never scary, never sarcastic"
   banned_topics:
-    - "politics and elections"
-    - "ongoing wars or current conflicts"
-    - "medical or financial advice"
-    - "named living private individuals"
+    - "anything frightening: darkness, danger, monsters as threats, getting lost alone"
+    - "conflict between characters, teasing, exclusion"
+    - "illness, injury, death, hospitals"
+    - "brands, money, advertising"
+    - "real people, real places by name"
 
 longform:
   enabled: true
@@ -42,6 +68,19 @@ video:
   max_clips: 12                # long-form B-roll clip count (12 x 8s = $3.84 at fast/1080p)
   # How long each clip holds the screen before cutting to the next one.
   segment_seconds: 11
+
+  # Looping a clip forward-then-backward is invisible on atmospheric B-roll and
+  # is what keeps the documentary mode affordable. On a story it is not: a
+  # character walks backwards halfway through the shot. Turn it off for
+  # animation and every second on screen is generated once, at full price.
+  reuse_clips: false
+
+  # text -> text-to-video, a fresh subject every call
+  # image -> image-to-video from a reference still, which is the only way to
+  #          keep the same character across shots and across videos
+  generation: "image"
+  # Stills the character must match. Cycled across shots; add more for variety.
+  reference_dir: "assets/characters"
   transition_seconds: 0.5      # 0 disables cross-fades and uses hard cuts
   concurrency: 3               # how many clips to generate at once
   generate_audio: false        # we lay our own narration over the footage
@@ -84,9 +123,13 @@ publish:
   publish_at_local: "19:00"
   # Shorts go out at a different slot so the two never compete with each other.
   shorts_publish_at_local: "12:00"
-  # 27 = Education, 28 = Science & Technology, 24 = Entertainment
-  category_id: "27"
-  made_for_kids: false
+  # 27 = Education, 28 = Science & Technology, 24 = Entertainment,
+  # 1 = Film & Animation
+  category_id: "1"
+  # Required by COPPA for content aimed at children. Setting it turns off
+  # personalised ads, comments, notifications, end screens and cards. It is a
+  # legal declaration, not a preference — do not set it false to keep the ads.
+  made_for_kids: true
   default_tags:
     - "documentary"
     - "explained"
