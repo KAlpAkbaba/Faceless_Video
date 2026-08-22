@@ -359,13 +359,51 @@ def cmd_voices(config: Config, args: argparse.Namespace) -> int:
         if not available:
             print("The account has no voices.")
             return 1
+        def rating(voice: dict) -> tuple[int, str]:
+            """Sort the plausible ones to the top and label why."""
+            labels = {k: str(v).lower() for k, v in (voice.get("labels") or {}).items()}
+            age = labels.get("age", "")
+            use_case = labels.get("use_case", "")
+            if "child" in age or "kid" in age:
+                return 0, "child"
+            if "young" in age and "animation" in use_case:
+                return 1, "young + animation"
+            if "animation" in use_case:
+                return 2, "animation"
+            if "young" in age:
+                return 3, "young adult"
+            return 4, ""
+
+        ranked = sorted(available, key=lambda v: (rating(v)[0], v.get("name", "")))
+        children = [v for v in ranked if rating(v)[0] == 0]
+
         print(f"{len(available)} voices on this account:\n")
-        print(f"  {'voice_id':<24} {'name':<26} labels")
-        print("  " + "-" * 76)
-        for voice in available:
-            labels = voice.get("labels") or {}
-            summary = ", ".join(f"{k}={v}" for k, v in sorted(labels.items()))
-            print(f"  {voice.get('voice_id', ''):<24} {voice.get('name', ''):<26} {summary}")
+        print(f"  {'':<3} {'voice_id':<24} {'name':<24} {'fit':<18} labels")
+        print("  " + "-" * 96)
+        for voice in ranked:
+            score, why = rating(voice)
+            marker = "**" if score == 0 else ("* " if score <= 2 else "  ")
+            labels = ", ".join(f"{k}={v}" for k, v in sorted((voice.get("labels") or {}).items()))
+            print(f"  {marker:<3} {voice.get('voice_id', ''):<24} "
+                  f"{voice.get('name', '')[:24]:<24} {why:<18} {labels[:60]}")
+
+        print()
+        if children:
+            print(f"{len(children)} child voice(s) found, marked **.")
+        else:
+            print(
+                "NO CHILD VOICES ON THIS ACCOUNT.\n\n"
+                "The default set has none — 'young' means a young adult, not a child,\n"
+                "and a young adult voice reading a preschool script sounds like an\n"
+                "adult doing an impression, which is worse than a plain narrator.\n\n"
+                "Add some first: elevenlabs.io -> Voices -> Voice Library, filter by\n"
+                "Age = Young / Child, or search 'child', 'kid', 'little girl', 'little\n"
+                "boy'. Audition them there, add the ones you like to your account,\n"
+                "then run this again.\n\n"
+                "The voices marked * are the next best thing: built for character\n"
+                "animation. Bobo and Pip can work with those, since a monster and a\n"
+                "robot are not supposed to sound like children anyway."
+            )
         print(
             "\nPut one id per character under voice.elevenlabs_cast in config.yaml. "
             "Six\ndifferent voices is the point — do not reuse one id across characters."

@@ -14,6 +14,18 @@ import yaml
 log = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# Names worth warning about when they appear commented out in .env.
+KNOWN_CREDENTIALS = {
+    "ANTHROPIC_API_KEY",
+    "LTX_API_KEY",
+    "LTX_API_BASE",
+    "FAL_KEY",
+    "ELEVENLABS_API_KEY",
+    "YOUTUBE_CLIENT_ID",
+    "YOUTUBE_CLIENT_SECRET",
+    "YOUTUBE_REFRESH_TOKEN",
+}
 DEFAULT_CONFIG_PATH = REPO_ROOT / "config.yaml"
 
 
@@ -74,9 +86,18 @@ def load_dotenv(path: Path | None = None) -> int:
         return 0
 
     loaded = 0
+    commented: list[str] = []
     for raw in env_path.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
+        if not line or "=" not in line:
+            continue
+        if line.startswith("#"):
+            # A credential left commented out is silently absent, and the
+            # error it eventually causes points at the environment rather
+            # than at the file where the value is sitting.
+            candidate = line.lstrip("#").strip().partition("=")[0].strip()
+            if candidate in KNOWN_CREDENTIALS and line.partition("=")[2].strip():
+                commented.append(candidate)
             continue
         # `export KEY=value` is a common shape in a file meant to be sourced.
         if line.startswith("export "):
@@ -91,6 +112,12 @@ def load_dotenv(path: Path | None = None) -> int:
 
     if loaded:
         log.info("Loaded %d value(s) from %s", loaded, env_path.name)
+    for name in commented:
+        log.warning(
+            "%s has a value in %s but the line starts with '#', so it is a comment "
+            "and was ignored. Remove the '#'.",
+            name, env_path.name,
+        )
     return loaded
 
 
