@@ -15,6 +15,7 @@ from .media import require_ffmpeg
 from .models import RenderRequest, RenderResult
 from .providers import build_provider
 from .providers.ltx import resolve_dimensions
+from .references import load_library
 from .state import History
 from .thumbnail import build_thumbnail
 from .voice import synthesize
@@ -132,6 +133,7 @@ def run(config: Config, options: RunOptions | None = None) -> RunReport:
     write_debug_bundle(work_dir, idea, package)
 
     provider = build_provider(config)
+    references = load_library(config) if config.get("video.generation") == "image" else None
     results: list[RenderResult] = []
     longform_clip_assets = []
 
@@ -152,6 +154,7 @@ def run(config: Config, options: RunOptions | None = None) -> RunReport:
                 resolution=resolution,
                 prefix="lf",
                 concurrency=int(config.get("video.concurrency", 3)),
+                references=references,
             )
             request = RenderRequest(
                 kind="longform",
@@ -189,6 +192,7 @@ def run(config: Config, options: RunOptions | None = None) -> RunReport:
                     resolution=resolution,
                     prefix="sh",
                     concurrency=int(config.get("video.concurrency", 3)),
+                    references=references,
                 )
             else:
                 # Centre-crop the long-form footage; the assembler handles the crop.

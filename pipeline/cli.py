@@ -51,6 +51,11 @@ def build_parser() -> argparse.ArgumentParser:
     probe.add_argument("--seconds", type=float, default=None, help="Defaults to video.clip_seconds.")
     probe.add_argument("--model", default=None, help="Override video.model for this probe.")
     probe.add_argument(
+        "--image",
+        action="store_true",
+        help="Probe image-to-video instead, using the first reference frame.",
+    )
+    probe.add_argument(
         "--discover",
         action="store_true",
         help="Try each known resolution spelling until the API accepts one. "
@@ -163,7 +168,17 @@ def cmd_probe(config: Config, args: argparse.Namespace) -> int:
     mode = "discovering a working resolution" if args.discover else f"at {resolution}, {seconds:g}s"
     print(f"Probing {config.get('video.provider')} / {config.get('video.model')} {mode}\n")
     try:
-        if args.discover:
+        if args.image:
+            from .references import load_library
+
+            frame = load_library(config).frames[0]
+            print(f"Using reference frame: {frame.name}\n")
+            discover = getattr(provider, "discover_image_to_video", None)
+            if discover is None:
+                print(f"{provider.name} has no image discovery mode.", file=sys.stderr)
+                return 2
+            report = discover(args.prompt, seconds=seconds, reference=frame)
+        elif args.discover:
             discover = getattr(provider, "discover", None)
             if discover is None:
                 print(f"{provider.name} has no discovery mode.", file=sys.stderr)
