@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -9,6 +10,8 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
+
+log = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_PATH = REPO_ROOT / "config.yaml"
@@ -33,6 +36,7 @@ class Secrets:
 
     @classmethod
     def from_env(cls) -> "Secrets":
+        load_dotenv()
         return cls(
             anthropic_api_key=_env("ANTHROPIC_API_KEY"),
             ltx_api_key=_env("LTX_API_KEY"),
@@ -55,6 +59,39 @@ class Secrets:
 def _env(name: str) -> str | None:
     value = os.environ.get(name, "").strip()
     return value or None
+
+
+def load_dotenv(path: Path | None = None) -> int:
+    """Read .env into the environment, without overriding what is already set.
+
+    Real environment variables always win, so CI — where the values come from
+    repository secrets — is never shadowed by a file someone left in a
+    checkout. Local runs get their credentials without exporting anything by
+    hand, which on PowerShell in particular is easy to get wrong.
+    """
+    env_path = path or (REPO_ROOT / ".env")
+    if not env_path.exists():
+        return 0
+
+    loaded = 0
+    for raw in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        # `export KEY=value` is a common shape in a file meant to be sourced.
+        if line.startswith("export "):
+            line = line[len("export "):].lstrip()
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip("\"'")
+        if not key or key in os.environ:
+            continue
+        os.environ[key] = value
+        loaded += 1
+
+    if loaded:
+        log.info("Loaded %d value(s) from %s", loaded, env_path.name)
+    return loaded
 
 
 class Config:

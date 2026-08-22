@@ -127,7 +127,17 @@ python -m venv .venv
 > aboneliği API'yi kapsamaz; API anahtarı Developer Console'dan alınır ve ayrı
 > faturalanır.
 
-`.env.example` dosyasını `.env` olarak kopyalayıp doldur.
+`.env.example` dosyasını `.env` olarak kopyalayıp doldur — kod onu otomatik
+okur, hiçbir şeyi elle export etmen gerekmez:
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+
+Gerçek ortam değişkenleri her zaman `.env`'in önüne geçer, yani GitHub
+Actions'taki secret'lar bir checkout'ta unutulmuş `.env` tarafından gölgelenmez.
+`.env` zaten `.gitignore`'da; repoya girmez.
 
 ### 2.3 YouTube yetkilendirmesi (bir kez, kendi bilgisayarında)
 
