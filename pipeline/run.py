@@ -36,6 +36,48 @@ class RunOptions:
     output_dir: Path | None = None
 
 
+def trim_shots(
+    shots: list,
+    narration_seconds: float,
+    reuse: bool,
+    planned: int,
+    clip_seconds: float,
+    transition: float,
+    label: str,
+) -> list:
+    """Generate only as many shots as the finished cut can actually show.
+
+    The writer is asked for a shot count derived from the *target* runtime, but
+    what it wrote decides the real one, and that is only known once the
+    narration has been synthesised. Any shot past the end of the voiceover is
+    generated, paid for, and then trimmed away by the assembler.
+
+    With clips looped this does not arise — the count is a quality dial, not a
+    length — so the planned number stands.
+    """
+    if reuse:
+        return shots[:planned]
+
+    from .assemble import TAIL_SECONDS
+
+    needed = shots_for_duration(narration_seconds + TAIL_SECONDS, clip_seconds, transition)
+    if needed < len(shots):
+        log.info(
+            "%s: narration runs %.0fs, so %d of %d shots are needed (%.0fs of "
+            "generation not spent)",
+            label, narration_seconds, needed, len(shots),
+            (len(shots) - needed) * clip_seconds,
+        )
+    elif needed > len(shots):
+        # The writer wrote long. Better a slightly short tail than a gap.
+        log.warning(
+            "%s: narration runs %.0fs and would need %d shots, but only %d were "
+            "written; the last shot will be held longer.",
+            label, narration_seconds, needed, len(shots),
+        )
+    return shots[:needed]
+
+
 @dataclass
 class RunReport:
     slug: str
@@ -145,10 +187,12 @@ def run(config: Config, options: RunOptions | None = None) -> RunReport:
             width, height = resolve_dimensions(resolution, aspect)
 
             voiceover = synthesize(config, package.longform.narration, work_dir / "longform" / "narration.mp3")
+            shots = trim_shots(package.longform.shots, voiceover.duration, reuse, longform_clips,
+                               clip_seconds, transition, "long-form")
             longform_clip_assets = generate_clips(
                 config,
                 provider,
-                package.longform.shots[:longform_clips],
+                shots,
                 work_dir=work_dir / "clips_longform",
                 aspect_ratio=aspect,
                 resolution=resolution,
@@ -186,7 +230,8 @@ def run(config: Config, options: RunOptions | None = None) -> RunReport:
                 shorts_assets = generate_clips(
                     config,
                     provider,
-                    package.shorts.shots[: int(config.get("shorts.max_clips", 6))],
+                    trim_shots(package.shorts.shots, voiceover.duration, reuse, shorts_clips,
+                               clip_seconds, transition, "shorts"),
                     work_dir=work_dir / "clips_shorts",
                     aspect_ratio=aspect,
                     resolution=resolution,

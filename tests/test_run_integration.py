@@ -177,3 +177,29 @@ def test_budget_ceiling_stops_the_run_before_any_call(tmp_path, patched):
         run(config, RunOptions(only="shorts", upload=False,
                                work_dir=tmp_path / "work", output_dir=tmp_path / "out"))
     assert patched.calls == []
+
+
+def test_shots_are_trimmed_to_the_narration_that_was_written():
+    """Shots past the end of the voiceover are generated and then thrown away.
+
+    The writer is asked for a count derived from the target runtime; the words
+    it actually wrote decide the real one.
+    """
+    from pipeline.run import trim_shots
+
+    shots = list(range(48))
+
+    # 318s of narration at 8s a shot needs far fewer than 48.
+    kept = trim_shots(shots, 318.0, reuse=False, planned=48,
+                      clip_seconds=8, transition=0.5, label="test")
+    assert len(kept) == 43
+    assert kept == shots[:43]
+
+    # With looping, the planned count is a quality dial and stands.
+    assert len(trim_shots(shots, 318.0, reuse=True, planned=12,
+                          clip_seconds=8, transition=0.5, label="test")) == 12
+
+    # Writing long must not invent shots that do not exist.
+    short_list = list(range(5))
+    assert trim_shots(short_list, 318.0, reuse=False, planned=5,
+                      clip_seconds=8, transition=0.5, label="test") == short_list
