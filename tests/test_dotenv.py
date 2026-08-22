@@ -43,3 +43,31 @@ def test_comments_blanks_quotes_and_export_are_handled(tmp_path, monkeypatch):
 
 def test_a_missing_file_is_not_an_error(tmp_path):
     assert load_dotenv(tmp_path / "nope.env") == 0
+
+
+def test_a_commented_credential_is_reported(tmp_path, monkeypatch, caplog):
+    """A key left commented out is invisible, and the error blames the
+    environment rather than the file the value is sitting in."""
+    import logging
+
+    env = tmp_path / ".env"
+    env.write_text("# ELEVENLABS_API_KEY=sk-real-value\nLTX_API_KEY=x\n", encoding="utf-8")
+    monkeypatch.delenv("LTX_API_KEY", raising=False)
+
+    with caplog.at_level(logging.WARNING):
+        load_dotenv(env)
+
+    assert "ELEVENLABS_API_KEY" in caplog.text
+    assert "comment" in caplog.text
+
+
+def test_an_ordinary_comment_is_not_reported(tmp_path, caplog):
+    import logging
+
+    env = tmp_path / ".env"
+    env.write_text("# this file holds secrets\n# ELEVENLABS_API_KEY=\n", encoding="utf-8")
+
+    with caplog.at_level(logging.WARNING):
+        load_dotenv(env)
+
+    assert "comment" not in caplog.text
