@@ -175,13 +175,18 @@ class LTXProvider:
 
         return download(self.client, url, destination)
 
-    def probe(self, prompt: str) -> dict[str, Any]:
-        """Submit one short cheap job and report exactly what came back."""
+    def probe(self, prompt: str, *, resolution: str, seconds: float) -> dict[str, Any]:
+        """Submit one job and report exactly what came back.
+
+        The resolution has to be one the model actually accepts — LTX 2.3
+        rejects anything below 1080p — so it comes from the caller rather than
+        being pinned to a cheap-looking value here.
+        """
         request = ClipRequest(
             prompt=prompt,
-            seconds=float(self.config.get("video.clip_seconds", 8)),
+            seconds=seconds,
             aspect_ratio="16:9",
-            resolution="480p",
+            resolution=resolution,
             negative_prompt="",
             seed=None,
         )

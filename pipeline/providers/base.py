@@ -45,8 +45,8 @@ class VideoProvider(Protocol):
     def generate(self, request: ClipRequest, destination: Path) -> Path:
         """Generate one clip and write it to `destination`."""
 
-    def probe(self, prompt: str) -> dict[str, Any]:
-        """Submit one minimal job and return the raw submit response, for diagnostics."""
+    def probe(self, prompt: str, *, resolution: str, seconds: float) -> dict[str, Any]:
+        """Submit one job and return the raw responses, for diagnostics."""
 
 
 # ---------------------------------------------------------------------------

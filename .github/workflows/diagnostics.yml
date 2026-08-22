@@ -40,7 +40,7 @@ jobs:
       - name: Warn before spending
         if: inputs.check == 'probe'
         run: |
-          echo "::notice::probe submits one real 480p clip to LTX. It costs a few cents."
+          echo "::notice::probe submits one real clip at longform.resolution (LTX 2.3 has no cheaper tier than 1080p). At the default 12 clip settings that is about \$0.32."
 
       - name: Run ${{ inputs.check }}
         env:
