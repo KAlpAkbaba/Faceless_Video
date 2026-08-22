@@ -77,3 +77,60 @@ def test_discovery_sweeps_the_configured_model_first():
     models = [configured] + [m for m in MODEL_CANDIDATES if m != configured]
     assert models[0] == configured
     assert len(models) == len(set(models))
+
+
+class _FakeResponse:
+    """Minimal stand-in for httpx.Response, for the binary-detection tests."""
+
+    def __init__(self, content: bytes, content_type: str = ""):
+        self.content = content
+        self.headers = {"content-type": content_type} if content_type else {}
+
+
+def test_inline_video_is_detected_by_content_type():
+    from pipeline.providers.ltx import looks_like_video
+
+    assert looks_like_video(_FakeResponse(b"", "video/mp4"))
+    assert looks_like_video(_FakeResponse(b"", "application/octet-stream"))
+
+
+def test_inline_video_is_detected_by_iso_header_when_mislabelled():
+    # The live API answers with the MP4 itself; a wrong Content-Type must not
+    # send the bytes down the JSON path, where they parse as nothing.
+    from pipeline.providers.ltx import looks_like_video
+
+    mp4 = b"\x00\x00\x00 ftypisom\x00\x00\x02\x00isomiso2avc1mp41"
+    assert looks_like_video(_FakeResponse(mp4))
+    assert looks_like_video(_FakeResponse(mp4, "text/plain"))
+
+
+def test_json_response_is_not_mistaken_for_video():
+    from pipeline.providers.ltx import looks_like_video
+
+    assert not looks_like_video(_FakeResponse(b'{"id": "abc"}', "application/json"))
+    assert not looks_like_video(_FakeResponse(b'{"error": "bad"}'))
+
+
+def test_payload_sends_explicit_pixels_not_a_label():
+    """The API rejects '1080p', '4k' and bare '1080'; only WIDTHxHEIGHT works."""
+    import os
+
+    from pipeline.config import Config
+    from pipeline.providers.base import ClipRequest
+    from pipeline.providers.ltx import LTXProvider
+
+    os.environ.setdefault("LTX_API_KEY", "test-key")
+    config = Config.load()
+    provider = LTXProvider(config)
+
+    landscape = provider.build_payload(
+        ClipRequest(prompt="x", seconds=8, aspect_ratio="16:9",
+                    resolution="1080p", negative_prompt="", seed=1)
+    )
+    assert landscape["resolution"] == "1920x1080"
+
+    portrait = provider.build_payload(
+        ClipRequest(prompt="x", seconds=8, aspect_ratio="9:16",
+                    resolution="1080p", negative_prompt="", seed=1)
+    )
+    assert portrait["resolution"] == "1080x1920"

@@ -280,9 +280,19 @@ doğrudan okunamadı. Bu yüzden LTX istemcisi **şema-savunmacı** yazıldı:
 `LTX_API_BASE`, `LTX_SUBMIT_PATH`, `LTX_STATUS_PATH` ile sabitle — kod
 değiştirmen gerekmez.
 
-**Doğrulanmış durum (Ağustos 2026):** `probe` ile teyit edildi — taban
-`https://api.ltx.video/v1`, gönderim yolu `/text-to-video`, `Bearer` token
-kimlik doğrulaması. Varsayılanlar doğru; bu değişkenleri ayarlaman gerekmiyor.
+**Doğrulanmış durum (Ağustos 2026)** — `probe --discover` ile canlı API'den teyit edildi:
+
+| | |
+|---|---|
+| Taban | `https://api.ltx.video/v1` |
+| Yol | `/text-to-video` |
+| Kimlik | `Authorization: Bearer <LTX_API_KEY>` |
+| Model | `ltx-2-3-fast` |
+| Çözünürlük | **`1920x1080` biçiminde** — `1080p`, `4k`, `1080` gibi etiketlerin hepsi reddediliyor |
+| Yanıt | **Senkron ve ikili**: iş kimliği değil, doğrudan MP4 gövdesi döner (~32 sn) |
+
+Son iki satır sürpriz oldu ve kodun ikisine de uyarlanması gerekti. Model listesi
+uç noktası (`/models` vb.) yok.
 
 **Çözünürlük değerinin yazımı modele özgü.** `1080p` ve `480p` gibi görünür
 adlar `ltx-2-3-fast` tarafından reddediliyor; API farklı bir enum bekliyor.

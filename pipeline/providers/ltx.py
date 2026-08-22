@@ -82,6 +82,19 @@ RESOLUTION_PIXELS = {
 }
 
 
+def looks_like_video(response: httpx.Response) -> bool:
+    """Does this response carry the video itself rather than a job record?
+
+    The LTX endpoint answers synchronously with the finished MP4, so there is
+    often nothing to poll. Content-Type is the primary signal; the ISO base
+    media box header is the fallback for a server that mislabels it.
+    """
+    content_type = response.headers.get("content-type", "").lower()
+    if content_type.startswith(("video/", "application/octet-stream")):
+        return True
+    return response.content[4:8] == b"ftyp"
+
+
 class LTXProvider:
     name = "ltx"
 
@@ -121,7 +134,9 @@ class LTXProvider:
             "model": self.model,
             "prompt": request.prompt,
             "duration": int(round(request.seconds)),
-            "resolution": request.resolution,
+            # Verified against the live API: it wants explicit pixels, and
+            # rejects every friendly label ("1080p", "4k", bare "1080").
+            "resolution": f"{width}x{height}",
             "aspect_ratio": request.aspect_ratio,
             "width": width,
             "height": height,
@@ -159,8 +174,11 @@ class LTXProvider:
                     "Check LTX_API_KEY in the Developer Console."
                 )
 
-            body = raise_for_api_error(response, f"LTX submit {path}")
             self._submit_path = path
+            if response.status_code < 400 and looks_like_video(response):
+                # The video came back inline; there is no job to track.
+                return {"_inline_video": response.content}
+            body = raise_for_api_error(response, f"LTX submit {path}")
             return body
 
         raise VideoGenerationError(
@@ -198,7 +216,17 @@ class LTXProvider:
         log.info("LTX submit: %.60s...", request.prompt)
         submitted = self._submit(payload)
 
-        # Some deployments answer synchronously with the finished asset.
+        inline = submitted.get("_inline_video")
+        if inline:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(inline)
+            if destination.stat().st_size < 1024:
+                destination.unlink(missing_ok=True)
+                raise VideoGenerationError("LTX returned an implausibly small video.")
+            log.info("Received %s inline (%.1f MB)", destination.name, len(inline) / 1e6)
+            return destination
+
+        # Otherwise it is a job record: find the asset, polling if need be.
         url = find_video_url(submitted)
         if not url:
             job_id = find_job_id(submitted)
@@ -215,7 +243,7 @@ class LTXProvider:
 
         return download(self.client, url, destination)
 
-    def try_submit(self, payload: dict[str, Any]) -> tuple[int, str]:
+    def try_submit(self, payload: dict[str, Any]) -> tuple[int, str]:  # noqa: D401
         """POST a payload and return (status, body) without raising.
 
         Used by discovery, where a 4xx is the useful answer rather than a
@@ -223,6 +251,9 @@ class LTXProvider:
         """
         path = self._submit_path or SUBMIT_PATHS[0]
         response = self.client.post(f"{self.base_url}{path}", json=payload)
+        if response.status_code < 400 and looks_like_video(response):
+            # Do not paste megabytes of binary into a diagnostic report.
+            return response.status_code, f"<{len(response.content)} bytes of video>"
         return response.status_code, response.text[:400]
 
     def list_models(self) -> dict[str, Any]:
@@ -328,12 +359,17 @@ class LTXProvider:
         )
         payload = self.build_payload(request)
         submitted = self._submit(payload)
+        inline = submitted.pop("_inline_video", None)
         result: dict[str, Any] = {
             "base_url": self.base_url,
             "submit_path": self._submit_path,
             "request_body": payload,
-            "submit_response": submitted,
+            "submit_response": (
+                f"<{len(inline)} bytes of video returned inline>" if inline else submitted
+            ),
         }
+        if inline:
+            return result
         job_id = find_job_id(submitted)
         if job_id and not find_video_url(submitted):
             try:
