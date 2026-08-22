@@ -275,9 +275,17 @@ doğrudan okunamadı. Bu yüzden LTX istemcisi **şema-savunmacı** yazıldı:
   adı `id`, `job_id`, `generation_id`, `video_url`, `output.url` vb. olabilir.
 - Hem `resolution` hem açık `width`/`height` gönderilir.
 
-İlk kurulumda **mutlaka `make probe` çalıştır.** Tek bir ucuz 480p iş gönderir
-ve ham istek/yanıtı basar. Yollar farklıysa `LTX_API_BASE`, `LTX_SUBMIT_PATH`,
-`LTX_STATUS_PATH` ile sabitle — kod değiştirmen gerekmez.
+İlk kurulumda **mutlaka `make probe` çalıştır** (ya da Actions → Diagnostics →
+`probe`). Tek bir gerçek iş gönderir ve ham istek/yanıtı basar. Yollar farklıysa
+`LTX_API_BASE`, `LTX_SUBMIT_PATH`, `LTX_STATUS_PATH` ile sabitle — kod
+değiştirmen gerekmez.
+
+**Doğrulanmış durum (Ağustos 2026):** `probe` ile teyit edildi — taban
+`https://api.ltx.video/v1`, gönderim yolu `/text-to-video`, `Bearer` token
+kimlik doğrulaması. Varsayılanlar doğru; bu değişkenleri ayarlaman gerekmiyor.
+
+LTX 2.3 **1080p'nin altını kabul etmiyor**; `longform.resolution` değerini
+düşürerek tasarruf edemezsin, bunun yerine `video.max_clips`'i düşür.
 
 Model kimliği: `ltx-2-fast` ve `ltx-2-pro` **15 Ağustos 2026'da kapatıldı**.
 Varsayılan `ltx-2-3-fast`.

@@ -97,12 +97,12 @@ class FalLTXProvider:
             raise VideoGenerationError(f"fal request {request_id} finished without a video URL: {final}")
         return download(self.client, url, destination)
 
-    def probe(self, prompt: str) -> dict[str, Any]:
+    def probe(self, prompt: str, *, resolution: str, seconds: float) -> dict[str, Any]:
         request = ClipRequest(
             prompt=prompt,
-            seconds=float(self.config.get("video.clip_seconds", 8)),
+            seconds=seconds,
             aspect_ratio="16:9",
-            resolution="480p",
+            resolution=resolution,
             negative_prompt="",
             seed=None,
         )

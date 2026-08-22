@@ -41,8 +41,14 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("doctor", help="Check configuration, credentials and tooling.")
     sub.add_parser("plan", help="Print the cost estimate for a run without spending anything.")
 
-    probe = sub.add_parser("probe", help="Submit one cheap clip and dump the raw API responses.")
+    probe = sub.add_parser("probe", help="Submit one clip and dump the raw API responses.")
     probe.add_argument("--prompt", default="A slow pan across an empty workshop bench at dawn, dust in the light.")
+    probe.add_argument(
+        "--resolution",
+        default=None,
+        help="Defaults to longform.resolution. LTX 2.3 accepts 1080p and above only.",
+    )
+    probe.add_argument("--seconds", type=float, default=None, help="Defaults to video.clip_seconds.")
 
     auth = sub.add_parser("auth", help="Mint YouTube OAuth credentials. Run this locally, once.")
     auth.add_argument(
@@ -129,12 +135,19 @@ def cmd_plan(config: Config) -> int:
     return 0
 
 
-def cmd_probe(config: Config, prompt: str) -> int:
+def cmd_probe(config: Config, prompt: str, resolution: str | None, seconds: float | None) -> int:
     from .providers import build_provider
 
+    # The model decides which resolutions are legal, so probe with the one the
+    # real run will use rather than a cheaper value it may reject outright.
+    resolution = resolution or str(config.get("longform.resolution", "1080p"))
+    seconds = seconds if seconds is not None else float(config.get("video.clip_seconds", 8))
+
     provider = build_provider(config)
+    print(f"Probing {config.get('video.provider')} / {config.get('video.model')} "
+          f"at {resolution}, {seconds:g}s\n")
     try:
-        report = provider.probe(prompt)
+        report = provider.probe(prompt, resolution=resolution, seconds=seconds)
     finally:
         close = getattr(provider, "close", None)
         if callable(close):
@@ -200,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "plan":
             return cmd_plan(config)
         if args.command == "probe":
-            return cmd_probe(config, args.prompt)
+            return cmd_probe(config, args.prompt, args.resolution, args.seconds)
         if args.command == "run":
             return cmd_run(config, args)
     except BudgetExceeded as exc:
