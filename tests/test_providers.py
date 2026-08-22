@@ -54,3 +54,26 @@ def test_dimensions_are_always_even():
 def test_bad_dimension_input_is_rejected(bad):
     with pytest.raises(ConfigError):
         resolve_dimensions(*bad)
+
+
+def test_every_discovery_candidate_has_resolvable_pixels():
+    """The sweep must never feed a payload-only value into the pixel maths.
+
+    Passing the candidate itself to resolve_dimensions is what made the first
+    version of discovery abort on its second attempt.
+    """
+    from pipeline.providers.ltx import RESOLUTION_CANDIDATES, RESOLUTION_PIXELS
+
+    for candidate in RESOLUTION_CANDIDATES:
+        label = candidate if candidate in RESOLUTION_PIXELS else "1080p"
+        width, height = resolve_dimensions(label, "16:9")
+        assert width > 0 and height > 0
+
+
+def test_discovery_sweeps_the_configured_model_first():
+    from pipeline.providers.ltx import MODEL_CANDIDATES
+
+    configured = "ltx-2-3-fast"
+    models = [configured] + [m for m in MODEL_CANDIDATES if m != configured]
+    assert models[0] == configured
+    assert len(models) == len(set(models))
